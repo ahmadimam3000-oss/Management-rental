@@ -275,6 +275,60 @@ async function startServer() {
     });
   });
 
+  // 6. Ephemeral OAuth Bridge Relay for GitHub Pages (solves auth/unauthorized-domain)
+  const authBridgeSessions = new Map<
+    string,
+    {
+      accessToken: string;
+      idToken: string | null;
+      user: {
+        uid: string;
+        email: string | null;
+        displayName: string | null;
+        photoURL: string | null;
+      };
+      createdAt: number;
+    }
+  >();
+
+  app.post('/api/auth-bridge/:sessionId', (req, res) => {
+    const { sessionId } = req.params;
+    const { accessToken, idToken, user } = req.body || {};
+    if (!sessionId || !accessToken || !user) {
+      res.status(400).json({ error: 'Invalid auth bridge payload' });
+      return;
+    }
+    const now = Date.now();
+    for (const [k, v] of authBridgeSessions.entries()) {
+      if (now - v.createdAt > 180_000) {
+        authBridgeSessions.delete(k);
+      }
+    }
+    authBridgeSessions.set(sessionId, {
+      accessToken,
+      idToken: idToken || null,
+      user,
+      createdAt: now,
+    });
+    res.json({ ok: true });
+  });
+
+  app.get('/api/auth-bridge/:sessionId', (req, res) => {
+    const { sessionId } = req.params;
+    const entry = authBridgeSessions.get(sessionId);
+    if (!entry) {
+      res.json({ ready: false });
+      return;
+    }
+    authBridgeSessions.delete(sessionId);
+    res.json({
+      ready: true,
+      accessToken: entry.accessToken,
+      idToken: entry.idToken,
+      user: entry.user,
+    });
+  });
+
   // Vite middleware for development or static serving for production
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');

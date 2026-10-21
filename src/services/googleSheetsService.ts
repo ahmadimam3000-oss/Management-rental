@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getAuth,
   signInWithPopup,
+  signInWithCredential,
   GoogleAuthProvider,
   onAuthStateChanged,
   User,
@@ -150,9 +151,17 @@ export const initAuth = (
   });
 };
 
+export interface BridgeAuthUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+}
+
 export const googleSignIn = async (): Promise<{
   user: User;
   accessToken: string;
+  idToken: string | null;
 } | null> => {
   try {
     isSigningIn = true;
@@ -163,13 +172,49 @@ export const googleSignIn = async (): Promise<{
     }
 
     cachedAccessToken = credential.accessToken;
-    return { user: result.user, accessToken: cachedAccessToken };
+    return {
+      user: result.user,
+      accessToken: cachedAccessToken,
+      idToken: credential.idToken || null,
+    };
   } catch (error: unknown) {
     console.error('Sign in error:', error);
     throw error;
   } finally {
     isSigningIn = false;
   }
+};
+
+/**
+ * Complete Google Sign-In on a static domain (e.g. GitHub Pages) using the OAuth credential
+ * obtained from the Authorized Cloud Auth Bridge.
+ * Calling signInWithCredential uses accounts:signInWithIdp which does NOT fail on unauthorized-domain.
+ */
+export const completeBridgeSignIn = async (payload: {
+  accessToken: string;
+  idToken?: string | null;
+  user: BridgeAuthUser;
+}): Promise<{ user: User; accessToken: string }> => {
+  cachedAccessToken = payload.accessToken;
+  if (payload.idToken) {
+    try {
+      isSigningIn = true;
+      const cred = GoogleAuthProvider.credential(
+        payload.idToken,
+        payload.accessToken
+      );
+      const res = await signInWithCredential(auth, cred);
+      return { user: res.user, accessToken: payload.accessToken };
+    } catch (err) {
+      console.warn('signInWithCredential fallback:', err);
+    } finally {
+      isSigningIn = false;
+    }
+  }
+  return {
+    user: payload.user as unknown as User,
+    accessToken: payload.accessToken,
+  };
 };
 
 export const getAccessToken = async (): Promise<string | null> => {

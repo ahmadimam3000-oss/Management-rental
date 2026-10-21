@@ -35,6 +35,7 @@ import {
 import {
   initAuth,
   googleSignIn,
+  completeBridgeSignIn,
   logout,
   getAccessToken,
   listUserSpreadsheets,
@@ -47,6 +48,7 @@ import {
   ConnectedSheetInfo,
   SHEET_TABS,
 } from '../services/googleSheetsService';
+import { PUBLIC_SHARED_APP_ORIGIN } from '../utils/formatters';
 
 interface AppsScriptModalProps {
   isOpen: boolean;
@@ -187,6 +189,14 @@ export const AppsScriptModal: React.FC<AppsScriptModalProps> = ({
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [showUnauthorizedDomainFix, setShowUnauthorizedDomainFix] = useState(() => {
+    return typeof window !== 'undefined' && window.location.hostname.endsWith('.github.io');
+  });
+  const [copiedAuthDomain, setCopiedAuthDomain] = useState(false);
+  const [bridgeSessionId] = useState(() => {
+    return `ab_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  });
+  const [isBridgePolling, setIsBridgePolling] = useState(false);
 
   // Google Sheets UI states
   const [newSheetTitle, setNewSheetTitle] = useState(
@@ -220,11 +230,83 @@ export const AppsScriptModal: React.FC<AppsScriptModalProps> = ({
     return () => unsubscribe();
   }, []);
 
+  // Listen for postMessage or server relay from the Authorized Cloud Auth Bridge
+  useEffect(() => {
+    if (!isOpen || (!needsAuth && token)) return;
+
+    const handleBridgeMessage = async (event: MessageEvent) => {
+      const data = event.data;
+      if (
+        data &&
+        data.type === 'AIRENT_GOOGLE_AUTH_BRIDGE' &&
+        data.accessToken &&
+        data.user
+      ) {
+        const res = await completeBridgeSignIn({
+          accessToken: data.accessToken,
+          idToken: data.idToken,
+          user: data.user,
+        });
+        setToken(res.accessToken);
+        setUser(res.user);
+        setNeedsAuth(false);
+        setShowUnauthorizedDomainFix(false);
+        setIsBridgePolling(false);
+        setStatusMessage({
+          type: 'success',
+          text: `Berhasil masuk sebagai ${data.user.email} melalui Jembatan Cloud Resmi! Sekarang Anda dapat membuat atau menyinkronkan Google Sheets secara langsung.`,
+        });
+      }
+    };
+
+    window.addEventListener('message', handleBridgeMessage);
+    return () => window.removeEventListener('message', handleBridgeMessage);
+  }, [isOpen, needsAuth, token]);
+
+  useEffect(() => {
+    if (!isOpen || !isBridgePolling || (!needsAuth && token)) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `${PUBLIC_SHARED_APP_ORIGIN}/api/auth-bridge/${encodeURIComponent(bridgeSessionId)}`
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.ready && data.accessToken && data.user) {
+          const completed = await completeBridgeSignIn({
+            accessToken: data.accessToken,
+            idToken: data.idToken,
+            user: data.user,
+          });
+          setToken(completed.accessToken);
+          setUser(completed.user);
+          setNeedsAuth(false);
+          setShowUnauthorizedDomainFix(false);
+          setIsBridgePolling(false);
+          setStatusMessage({
+            type: 'success',
+            text: `Berhasil masuk sebagai ${data.user.email} melalui Jembatan Cloud Resmi! Sekarang Anda dapat membuat atau menyinkronkan Google Sheets secara langsung.`,
+          });
+        }
+      } catch {
+        // ignore network polling error
+      }
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [isOpen, isBridgePolling, needsAuth, token, bridgeSessionId]);
+
   useEffect(() => {
     setNewSheetTitle(`Ai Rent - Database & Keuangan Live (${activeBookYear})`);
   }, [activeBookYear]);
 
   if (!isOpen) return null;
+
+  const currentDomain =
+    typeof window !== 'undefined' && window.location.hostname
+      ? window.location.hostname
+      : 'ahmadimam3000-oss.github.io';
 
   const handleLogin = async () => {
     setIsLoggingIn(true);
@@ -235,6 +317,7 @@ export const AppsScriptModal: React.FC<AppsScriptModalProps> = ({
         setToken(result.accessToken);
         setUser(result.user);
         setNeedsAuth(false);
+        setShowUnauthorizedDomainFix(false);
         setStatusMessage({
           type: 'success',
           text: `Berhasil masuk sebagai ${result.user.email}. Sekarang Anda dapat membuat atau menyinkronkan Google Sheets secara langsung.`,
@@ -242,10 +325,19 @@ export const AppsScriptModal: React.FC<AppsScriptModalProps> = ({
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setStatusMessage({
-        type: 'error',
-        text: `Login Google gagal: ${msg}`,
-      });
+      if (msg.includes('auth/unauthorized-domain')) {
+        setShowUnauthorizedDomainFix(true);
+        setIsBridgePolling(true);
+        setStatusMessage({
+          type: 'info',
+          text: `Domain "${currentDomain}" belum didaftarkan di Firebase Authorized Domains. Gunakan tombol "Login via Jembatan Cloud Resmi" di bawah untuk langsung masuk sekarang, atau tambahkan "${currentDomain}" di Firebase Console dalam 10 detik.`,
+        });
+      } else {
+        setStatusMessage({
+          type: 'error',
+          text: `Login Google gagal: ${msg}`,
+        });
+      }
     } finally {
       setIsLoggingIn(false);
     }
@@ -778,6 +870,98 @@ export const AppsScriptModal: React.FC<AppsScriptModalProps> = ({
                   )}
                 </div>
               </div>
+
+              {/* Solusi Instan auth/unauthorized-domain untuk GitHub Pages */}
+              {(needsAuth || !token) && showUnauthorizedDomainFix && (
+                <div className="p-4 bg-cyan-950/30 border border-cyan-500/40 rounded-xl space-y-3.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="font-bold text-cyan-300 text-xs flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
+                        <span>
+                          Solusi Instan Login Google di GitHub Pages (Mengatasi <code className="font-mono text-amber-300">auth/unauthorized-domain</code>)
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        Karena Anda mengakses dari domain baru (<code className="text-cyan-300 font-mono">{currentDomain}</code>), pilih salah satu dari 2 cara cepat berikut:
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Pilihan 1: Jembatan Cloud Resmi */}
+                    <div className="p-3.5 bg-slate-950/90 border border-emerald-500/40 rounded-xl space-y-2.5 flex flex-col justify-between">
+                      <div className="space-y-1">
+                        <div className="text-xs font-bold text-emerald-300">
+                          Cara 1: Login via Jembatan Cloud Resmi (Tanpa Setting)
+                        </div>
+                        <p className="text-[11px] text-slate-300 leading-relaxed">
+                          Klik tombol di bawah untuk login pada domain server resmi yang sudah terotorisasi. Begitu login selesai, halaman GitHub Pages ini akan <strong>otomatis masuk</strong>.
+                        </p>
+                      </div>
+                      <a
+                        href={`${PUBLIC_SHARED_APP_ORIGIN}/?auth_bridge=${encodeURIComponent(bridgeSessionId)}`}
+                        target="_blank"
+                        rel="opener"
+                        onClick={() => setIsBridgePolling(true)}
+                        className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-lg shadow-emerald-600/20"
+                      >
+                        <Cloud className="w-4 h-4" />
+                        <span>
+                          {isBridgePolling
+                            ? 'Menunggu Sesi Login... (Klik untuk Buka Ulang)'
+                            : 'Login Google via Jembatan Cloud Resmi'}
+                        </span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+
+                    {/* Pilihan 2: Whitelist Domain Permanen di Firebase Console */}
+                    <div className="p-3.5 bg-slate-950/90 border border-slate-800 rounded-xl space-y-2.5 flex flex-col justify-between">
+                      <div className="space-y-1">
+                        <div className="text-xs font-bold text-cyan-300">
+                          Cara 2: Daftarkan Domain Permanen di Firebase (10 Detik)
+                        </div>
+                        <p className="text-[11px] text-slate-300 leading-relaxed">
+                          Salin domain <code className="text-amber-300 font-mono">{currentDomain}</code>, buka <strong>Firebase Console &rarr; Authorized domains &rarr; Add domain</strong>, lalu tempel domain tersebut:
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(currentDomain);
+                            setCopiedAuthDomain(true);
+                            setTimeout(() => setCopiedAuthDomain(false), 2000);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 font-mono text-[11px] border border-slate-700 transition-colors"
+                        >
+                          {copiedAuthDomain ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <span className="text-emerald-300">Tersalin!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5 text-cyan-400" />
+                              <span>Salin: {currentDomain}</span>
+                            </>
+                          )}
+                        </button>
+                        <a
+                          href="https://console.firebase.google.com/project/promising-chord-bw2pc/authentication/settings"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-[11px] transition-colors"
+                        >
+                          <span>Buka Firebase Authorized Domains</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Currently Connected Google Sheet Banner */}
               {connectedSheetInfo && (

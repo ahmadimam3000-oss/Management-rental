@@ -940,6 +940,121 @@ export default function App() {
     showToast('✅ Berhasil memulihkan data dari cadangan!');
   };
 
+  // If app is opened as the Authorized Cloud OAuth Bridge for GitHub Pages (?auth_bridge=<sessionId>)
+  const authBridgeSessionId =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('auth_bridge')
+      : null;
+
+  const [bridgeLoading, setBridgeLoading] = useState(false);
+  const [bridgeSuccess, setBridgeSuccess] = useState<string | null>(null);
+  const [bridgeError, setBridgeError] = useState<string | null>(null);
+
+  if (authBridgeSessionId) {
+    const handleRunBridgeAuth = async () => {
+      setBridgeLoading(true);
+      setBridgeError(null);
+      try {
+        const { googleSignIn } = await import('./services/googleSheetsService');
+        const res = await googleSignIn();
+        if (res) {
+          const userPayload = {
+            uid: res.user.uid,
+            email: res.user.email,
+            displayName: res.user.displayName,
+            photoURL: res.user.photoURL,
+          };
+          // 1. Send directly to opener window if available
+          try {
+            window.opener?.postMessage(
+              {
+                type: 'AIRENT_GOOGLE_AUTH_BRIDGE',
+                sessionId: authBridgeSessionId,
+                accessToken: res.accessToken,
+                idToken: res.idToken,
+                user: userPayload,
+              },
+              '*'
+            );
+          } catch {
+            // ignore cross-window errors
+          }
+          // 2. Also relay via server memory endpoint so mobile tabs receive it automatically
+          try {
+            await fetch(`/api/auth-bridge/${encodeURIComponent(authBridgeSessionId)}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                accessToken: res.accessToken,
+                idToken: res.idToken,
+                user: userPayload,
+              }),
+            });
+          } catch {
+            // ignore network error
+          }
+          setBridgeSuccess(
+            `Berhasil login sebagai ${res.user.email}! Mengalihkan kembali ke halaman utama Ai Rent...`
+          );
+          setTimeout(() => {
+            try {
+              window.close();
+            } catch {
+              // ignore
+            }
+          }, 900);
+        }
+      } catch (err: unknown) {
+        setBridgeError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBridgeLoading(false);
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-5 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center mx-auto text-cyan-400 font-black text-lg">
+            AI
+          </div>
+          <div className="space-y-1.5">
+            <h1 className="text-lg font-extrabold text-white">
+              Jembatan Otentikasi Google Resmi · Ai Rent
+            </h1>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Halaman ini memproses login Google Workspace (Drive &amp; Sheets) pada domain server resmi yang sudah terotorisasi Firebase, lalu mengirimkan sesi login kembali ke halaman GitHub Pages Anda secara otomatis.
+            </p>
+          </div>
+
+          {bridgeSuccess ? (
+            <div className="p-4 rounded-xl bg-emerald-950/70 border border-emerald-500/50 text-emerald-200 text-xs font-semibold space-y-2">
+              <div>✅ {bridgeSuccess}</div>
+              <div className="text-[11px] text-emerald-300/80 font-normal">
+                Silakan kembali ke tab GitHub Pages Ai Rent Anda jika jendela ini tidak tertutup otomatis.
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={handleRunBridgeAuth}
+              disabled={bridgeLoading}
+              className="w-full py-3 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-sm transition-colors shadow-lg shadow-cyan-500/20"
+            >
+              {bridgeLoading
+                ? 'Menghubungkan ke Akun Google...'
+                : 'Lanjutkan Masuk dengan Google'}
+            </button>
+          )}
+
+          {bridgeError && (
+            <div className="p-3 rounded-xl bg-rose-950/70 border border-rose-500/50 text-rose-200 text-xs">
+              {bridgeError}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // If app is opened by owner/investor via dedicated financial report link
   if (isInvestorPortalView) {
     return (
