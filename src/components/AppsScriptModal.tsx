@@ -121,7 +121,7 @@ export const AppsScriptModal: React.FC<AppsScriptModalProps> = ({
     return localStorage.getItem('airent_gh_username_v1') || 'ahmadimam3000';
   });
   const [ghRepoName, setGhRepoName] = useState(() => {
-    return localStorage.getItem('airent_gh_repo_v1') || 'ai-rent';
+    return localStorage.getItem('airent_gh_repo_v1') || 'Management-rental';
   });
   const [savedGhPagesUrl, setSavedGhPagesUrl] = useState(() => {
     return localStorage.getItem('airent_github_pages_url_v1') || '';
@@ -1021,7 +1021,7 @@ export const AppsScriptModal: React.FC<AppsScriptModalProps> = ({
 
           {activeTab === 'github_hosting' && (() => {
             const cleanUser = ghUsername.trim().replace(/^@/, '') || 'username';
-            const cleanRepo = ghRepoName.trim().replace(/^\/+|\/+$/g, '') || 'ai-rent';
+            const cleanRepo = ghRepoName.trim().replace(/^\/+|\/+$/g, '') || 'Management-rental';
             const computedGhUrl = `https://${cleanUser}.github.io/${cleanRepo}`;
             const bookingGhUrl = `${computedGhUrl}/?mode=booking`;
             const investorGhUrl = `${computedGhUrl}/?view=investor`;
@@ -1043,8 +1043,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
-      - run: npm install
+      - run: npm install --no-audit --no-fund
       - run: npm run build
       - run: cp dist/index.html dist/404.html && touch dist/.nojekyll
       - uses: actions/configure-pages@v5
