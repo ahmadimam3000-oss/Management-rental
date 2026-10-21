@@ -2,6 +2,36 @@
 <html lang="id" class="dark" style="background-color: #020617; color: #f8fafc;">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function () {
+        var NativeWS = window.WebSocket;
+        if (!NativeWS) return;
+        function PatchedWebSocket(url, protocols) {
+          if (protocols === 'vite-hmr' || (typeof url === 'string' && url.indexOf('24678') !== -1)) {
+            return {
+              url: url,
+              readyState: 1,
+              OPEN: 1,
+              CONNECTING: 0,
+              CLOSING: 2,
+              CLOSED: 3,
+              send: function () {},
+              close: function () {},
+              addEventListener: function () {},
+              removeEventListener: function () {},
+              dispatchEvent: function () { return true; }
+            };
+          }
+          return protocols !== undefined ? new NativeWS(url, protocols) : new NativeWS(url);
+        }
+        PatchedWebSocket.prototype = NativeWS.prototype;
+        PatchedWebSocket.CONNECTING = NativeWS.CONNECTING;
+        PatchedWebSocket.OPEN = NativeWS.OPEN;
+        PatchedWebSocket.CLOSING = NativeWS.CLOSING;
+        PatchedWebSocket.CLOSED = NativeWS.CLOSED;
+        window.WebSocket = PatchedWebSocket;
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
     <meta name="theme-color" content="#020617" />
     <meta name="mobile-web-app-capable" content="yes" />
