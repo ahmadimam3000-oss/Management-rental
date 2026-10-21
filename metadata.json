@@ -1,0 +1,6 @@
+{
+  "name": "Ai Rent · Sistem Manajemen Rental Motor (13 Fleet)",
+  "description": "Ai Rent - Aplikasi manajemen operasional rental motor 13 unit armada dengan fitur Check-In/Check-Out, sewa per jam & harian, kalkulasi tarif otomatis, pencatatan pengeluaran operasional, laporan laba bersih bulanan, dan analisis ADR.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
