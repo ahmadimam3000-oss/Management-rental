@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#020617" />
+      <stop offset="50%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#083344" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+  <rect x="24" y="24" width="464" height="464" rx="92" fill="none" stroke="url(#accentGrad)" stroke-width="6" stroke-opacity="0.4" />
+  <!-- Scooter / Motorcycle Stylized Icon -->
+  <g transform="translate(76, 110)">
+    <circle cx="70" cy="210" r="46" fill="none" stroke="#06b6d4" stroke-width="18" />
+    <circle cx="70" cy="210" r="16" fill="#10b981" />
+    <circle cx="290" cy="210" r="46" fill="none" stroke="#06b6d4" stroke-width="18" />
+    <circle cx="290" cy="210" r="16" fill="#10b981" />
+    <path d="M70 210 L135 120 L215 120 L245 195 L115 195 Z" fill="none" stroke="#f8fafc" stroke-width="18" stroke-linejoin="round" stroke-linecap="round" />
+    <path d="M215 65 L255 65 L290 210" fill="none" stroke="#10b981" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M95 115 L165 115" fill="none" stroke="#06b6d4" stroke-width="22" stroke-linecap="round" />
+    <circle cx="268" cy="88" r="14" fill="#38bdf8" />
+  </g>
+  <text x="256" y="435" font-family="system-ui, -apple-system, sans-serif" font-size="56" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="2">AI RENT</text>
+</svg>
