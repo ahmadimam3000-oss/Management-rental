@@ -180,21 +180,36 @@ export const AppsScriptModal: React.FC<AppsScriptModalProps> = ({
     const cleanRepo = (repoInput ?? ghRepoName).trim().replace(/^\/+|\/+$/g, '') || 'Management-rental';
     setIsLoadingGhRuns(true);
     try {
-      const [runsRes, pagesRes] = await Promise.all([
+      const [runsRes, repoRes] = await Promise.all([
         fetch(`https://api.github.com/repos/${cleanOwner}/${cleanRepo}/actions/runs?per_page=3`),
-        fetch(`https://api.github.com/repos/${cleanOwner}/${cleanRepo}/pages`),
+        fetch(`https://api.github.com/repos/${cleanOwner}/${cleanRepo}`),
       ]);
+      let runsList: Array<{
+        id: number;
+        name: string;
+        status: string;
+        conclusion: string | null;
+        html_url: string;
+        display_title: string;
+        created_at: string;
+      }> = [];
       if (runsRes.ok) {
         const data = await runsRes.json();
-        setGhActionsRuns(data.workflow_runs || []);
+        runsList = data.workflow_runs || [];
+        setGhActionsRuns(runsList);
       } else {
         setGhActionsRuns([]);
       }
-      if (pagesRes.ok) {
-        const pData = await pagesRes.json();
-        setGhPagesStatus(pData.status || 'built');
+      if (repoRes.ok) {
+        const repoData = await repoRes.json();
+        const latestSuccess = runsList.some((r) => r.conclusion === 'success');
+        if (repoData.has_pages || latestSuccess) {
+          setGhPagesStatus('Live (Aktif)');
+        } else {
+          setGhPagesStatus('Menunggu Aktivasi');
+        }
       } else {
-        setGhPagesStatus('pending');
+        setGhPagesStatus('Repo Belum Ditemukan');
       }
     } catch {
       // Ignore network errors
@@ -1409,19 +1424,50 @@ jobs:
                         Status Live GitHub Actions: <code className="text-cyan-300 font-mono">{cleanUser}/{cleanRepo}</code>
                       </span>
                       {ghPagesStatus && (
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700">
+                        <span
+                          className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                            ghPagesStatus.includes('Live')
+                              ? 'bg-emerald-950/90 text-emerald-300 border-emerald-600/60'
+                              : 'bg-slate-900 text-slate-300 border-slate-700'
+                          }`}
+                        >
                           Pages: {ghPagesStatus}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <button
-                        onClick={() => fetchGhActionsStatus(cleanUser, cleanRepo)}
+                        onClick={() => {
+                          fetchGhActionsStatus(cleanUser, cleanRepo);
+                          fetchGhUserRepos(cleanUser);
+                        }}
                         disabled={isLoadingGhRuns}
                         className="flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-semibold transition-colors"
                       >
                         <RefreshCw className={`w-3 h-3 ${isLoadingGhRuns ? 'animate-spin' : ''}`} />
-                        <span>Cek Status Actions</span>
+                        <span>Refresh Status Repo</span>
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            if ('serviceWorker' in navigator) {
+                              const regs = await navigator.serviceWorker.getRegistrations();
+                              await Promise.all(regs.map((r) => r.unregister()));
+                            }
+                            if ('caches' in window) {
+                              const keys = await caches.keys();
+                              await Promise.all(keys.map((k) => caches.delete(k)));
+                            }
+                          } catch {
+                            // ignore
+                          }
+                          window.location.reload();
+                        }}
+                        className="flex items-center gap-1 px-2.5 py-1 bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-700/60 text-emerald-300 rounded-lg text-[11px] font-semibold transition-colors"
+                        title="Bersihkan cache Service Worker dan muat versi terbaru aplikasi"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Muat Versi Terbaru (Clear Cache)</span>
                       </button>
                       <a
                         href={`https://github.com/${cleanUser}/${cleanRepo}/actions`}
