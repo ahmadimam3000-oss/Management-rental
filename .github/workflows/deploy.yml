@@ -17,8 +17,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
+    outputs:
+      pages_ready: ${{ steps.configure_pages.outcome == 'success' && steps.upload_artifact.outcome == 'success' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -52,7 +54,6 @@ jobs:
           git add -A
           git commit -m "Deploy Ai Rent to GitHub Pages"
           git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
-          gh api -X POST "repos/${GITHUB_REPOSITORY}/pages" -f "source[branch]=gh-pages" -f "source[path]=/" || true
 
       - name: Configure GitHub Pages (Actions mode)
         id: configure_pages
@@ -69,8 +70,22 @@ jobs:
         with:
           path: './dist'
 
-      - name: Deploy to GitHub Pages (Actions mode)
-        if: steps.configure_pages.outcome == 'success' && steps.upload_artifact.outcome == 'success'
+      - name: Fallback enable Pages from gh-pages branch
+        if: steps.configure_pages.outcome != 'success'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/pages" -f "source[branch]=gh-pages" -f "source[path]=/" || true
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.pages_ready == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-        continue-on-error: true

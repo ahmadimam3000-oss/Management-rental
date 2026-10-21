@@ -118,7 +118,11 @@ export const AppsScriptModal: React.FC<AppsScriptModalProps> = ({
 
   // GitHub Pages Hosting Generator & Custom Domain State
   const [ghUsername, setGhUsername] = useState(() => {
-    return localStorage.getItem('airent_gh_username_v1') || 'ahmadimam3000';
+    const saved = localStorage.getItem('airent_gh_username_v1');
+    if (!saved || saved === 'ahmadimam3000') {
+      return 'ahmadimam3000-oss';
+    }
+    return saved;
   });
   const [ghRepoName, setGhRepoName] = useState(() => {
     return localStorage.getItem('airent_gh_repo_v1') || 'Management-rental';
@@ -126,12 +130,57 @@ export const AppsScriptModal: React.FC<AppsScriptModalProps> = ({
   const [savedGhPagesUrl, setSavedGhPagesUrl] = useState(() => {
     return localStorage.getItem('airent_github_pages_url_v1') || '';
   });
+  const [ghActionsRuns, setGhActionsRuns] = useState<
+    Array<{
+      id: number;
+      name: string;
+      status: string;
+      conclusion: string | null;
+      html_url: string;
+      display_title: string;
+      created_at: string;
+    }>
+  >([]);
+  const [isLoadingGhRuns, setIsLoadingGhRuns] = useState(false);
+  const [ghPagesStatus, setGhPagesStatus] = useState<string | null>(null);
+
+  const fetchGhActionsStatus = async (ownerInput?: string, repoInput?: string) => {
+    const cleanOwner = (ownerInput ?? ghUsername).trim().replace(/^@/, '') || 'ahmadimam3000-oss';
+    const cleanRepo = (repoInput ?? ghRepoName).trim().replace(/^\/+|\/+$/g, '') || 'Management-rental';
+    setIsLoadingGhRuns(true);
+    try {
+      const [runsRes, pagesRes] = await Promise.all([
+        fetch(`https://api.github.com/repos/${cleanOwner}/${cleanRepo}/actions/runs?per_page=3`),
+        fetch(`https://api.github.com/repos/${cleanOwner}/${cleanRepo}/pages`),
+      ]);
+      if (runsRes.ok) {
+        const data = await runsRes.json();
+        setGhActionsRuns(data.workflow_runs || []);
+      }
+      if (pagesRes.ok) {
+        const pData = await pagesRes.json();
+        setGhPagesStatus(pData.status || 'built');
+      } else {
+        setGhPagesStatus('pending');
+      }
+    } catch {
+      // Ignore network errors
+    } finally {
+      setIsLoadingGhRuns(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen && initialTab) {
       setActiveTab(initialTab);
     }
   }, [isOpen, initialTab]);
+
+  useEffect(() => {
+    if (isOpen && activeTab === 'github_hosting') {
+      fetchGhActionsStatus();
+    }
+  }, [isOpen, activeTab]);
 
   // Google Workspace OAuth states
   const [needsAuth, setNeedsAuth] = useState(true);
@@ -1035,9 +1084,14 @@ permissions:
   contents: write
   pages: write
   id-token: write
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
+    outputs:
+      pages_ready: \${{ steps.configure_pages.outcome == 'success' && steps.upload_artifact.outcome == 'success' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -1057,7 +1111,6 @@ jobs:
           git checkout -b gh-pages && git add -A
           git commit -m "Deploy Ai Rent to GitHub Pages"
           git push -f "https://x-access-token:\${GITHUB_TOKEN}@github.com/\${GITHUB_REPOSITORY}.git" gh-pages
-          gh api -X POST "repos/\${GITHUB_REPOSITORY}/pages" -f "source[branch]=gh-pages" -f "source[path]=/" || true
       - id: configure_pages
         uses: actions/configure-pages@v5
         continue-on-error: true
@@ -1069,15 +1122,29 @@ jobs:
         continue-on-error: true
         with:
           path: './dist'
-      - if: steps.configure_pages.outcome == 'success' && steps.upload_artifact.outcome == 'success'
-        uses: actions/deploy-pages@v4
-        continue-on-error: true`;
+      - if: steps.configure_pages.outcome != 'success'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api -X POST "repos/\${GITHUB_REPOSITORY}/pages" -f "source[branch]=gh-pages" -f "source[path]=/" || true
+  deploy:
+    needs: build
+    if: needs.build.outputs.pages_ready == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4`;
 
             const handleSaveGhDomain = () => {
               localStorage.setItem('airent_gh_username_v1', cleanUser);
               localStorage.setItem('airent_gh_repo_v1', cleanRepo);
               localStorage.setItem('airent_github_pages_url_v1', computedGhUrl);
               setSavedGhPagesUrl(computedGhUrl);
+              fetchGhActionsStatus(cleanUser, cleanRepo);
               setStatusMessage({
                 type: 'success',
                 text: `Domain GitHub Pages (${computedGhUrl}) berhasil diaktifkan sebagai link utama untuk QR Code Pesanan Mandiri & Link Investor!`,
@@ -1108,16 +1175,104 @@ jobs:
                     <div className="font-bold text-emerald-300 text-sm flex items-center gap-2 flex-wrap">
                       <span>Repository Sudah Siap 100% untuk Upload &amp; Hosting GitHub Pages</span>
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-900/80 text-emerald-200 border border-emerald-600/50">
-                        Dual-Mode Auto Deploy (gh-pages + Actions)
+                        Build + Firebase + Lockfile Verified
                       </span>
                     </div>
                     <p className="text-slate-300 text-[11px] leading-relaxed">
-                      Project ini telah dilengkapi file otomatis{' '}
-                      <code className="text-cyan-300 font-mono">.github/workflows/deploy.yml</code> (mendukung branch <code className="text-cyan-300 font-mono">gh-pages</code> maupun <code className="text-cyan-300 font-mono">GitHub Actions</code> tanpa error environment),{' '}
-                      <code className="text-cyan-300 font-mono">public/.nojekyll</code>, path aset relatif{' '}
-                      <code className="text-cyan-300 font-mono">base: &apos;./&apos;</code>, serta sinkronisasi lintas domain (CORS) ke Server Cloud &amp; Google Sheets Live API.
+                      Project ini telah dilengkapi <code className="text-cyan-300 font-mono">package-lock.json</code>, modul <code className="text-cyan-300 font-mono">react-is</code> untuk bundel produksi Vite, Firebase Firestore &amp; Auth (<code className="text-cyan-300 font-mono">promising-chord-bw2pc</code>), serta workflow otomatis <code className="text-cyan-300 font-mono">.github/workflows/deploy.yml</code>.
                     </p>
                   </div>
+                </div>
+
+                {/* Monitor Live GitHub Actions Run Status */}
+                <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Github className="w-4 h-4 text-cyan-400" />
+                      <span className="font-bold text-white text-xs">
+                        Status Live GitHub Actions: <code className="text-cyan-300 font-mono">{cleanUser}/{cleanRepo}</code>
+                      </span>
+                      {ghPagesStatus && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700">
+                          Pages: {ghPagesStatus}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => fetchGhActionsStatus(cleanUser, cleanRepo)}
+                        disabled={isLoadingGhRuns}
+                        className="flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-semibold transition-colors"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${isLoadingGhRuns ? 'animate-spin' : ''}`} />
+                        <span>Cek Status Actions</span>
+                      </button>
+                      <a
+                        href={`https://github.com/${cleanUser}/${cleanRepo}/actions`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 px-2.5 py-1 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-700/60 text-cyan-300 rounded-lg text-[11px] font-semibold transition-colors"
+                      >
+                        <span>Buka GitHub Actions</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
+
+                  {ghActionsRuns.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {ghActionsRuns.map((run) => {
+                        const isSuccess = run.conclusion === 'success';
+                        const isRunning = run.status === 'in_progress' || run.status === 'queued';
+                        return (
+                          <div
+                            key={run.id}
+                            className="flex items-center justify-between gap-3 px-3 py-2 bg-slate-900/90 border border-slate-800 rounded-lg text-[11px]"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span
+                                className={`w-2 h-2 rounded-full shrink-0 ${
+                                  isSuccess
+                                    ? 'bg-emerald-400'
+                                    : isRunning
+                                    ? 'bg-amber-400 animate-pulse'
+                                    : 'bg-rose-400'
+                                }`}
+                              />
+                              <span className="text-slate-200 font-medium truncate">
+                                {run.display_title || run.name}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span
+                                className={`px-2 py-0.5 rounded font-mono text-[10px] ${
+                                  isSuccess
+                                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-700/50'
+                                    : isRunning
+                                    ? 'bg-amber-950 text-amber-300 border border-amber-700/50'
+                                    : 'bg-rose-950 text-rose-300 border border-rose-700/50'
+                                }`}
+                              >
+                                {isRunning ? run.status : run.conclusion || run.status}
+                              </span>
+                              <a
+                                href={run.html_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-cyan-400 hover:text-cyan-300 underline"
+                              >
+                                Detail
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-slate-400">
+                      Klik <strong>Sync / Export to GitHub</strong> di bilah atas Google AI Studio untuk menjalankan workflow terbaru yang sudah diperbaiki.
+                    </div>
+                  )}
                 </div>
 
                 {/* 3 Langkah Cepat Upload ke GitHub */}

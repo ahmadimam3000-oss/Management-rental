@@ -3,6 +3,7 @@
   "appId": "1:141628390228:web:3b0951fc176a2d49b1e6c1",
   "apiKey": "AIzaSyAOBv61EkWEG9vMVFgBbX_4ckr5iHJAjwc",
   "authDomain": "promising-chord-bw2pc.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-sistemmanajemenr-19e1d90b-a7a7-4392-b13c-8bdd4028059d",
   "storageBucket": "promising-chord-bw2pc.firebasestorage.app",
   "messagingSenderId": "141628390228",
   "measurementId": "",

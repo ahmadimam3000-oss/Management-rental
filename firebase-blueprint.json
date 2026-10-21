@@ -1,0 +1,36 @@
+{
+  "entities": {
+    "RentalSnapshot": {
+      "title": "RentalSnapshot",
+      "description": "Synchronized operational snapshot for Ai Rent fleet, transactions, expenses, frequent renters, and archives.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "UID of the authenticated admin who updated the snapshot",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the last synchronization"
+        },
+        "version": {
+          "type": "number",
+          "description": "Monotonically increasing revision number"
+        }
+      },
+      "required": ["ownerId", "updatedAt", "version"]
+    }
+  },
+  "firestore": {
+    "/rentalSnapshots/{snapshotId}": {
+      "schema": {
+        "$ref": "#/entities/RentalSnapshot"
+      },
+      "description": "Stores synchronized operational metadata for authenticated admins"
+    }
+  }
+}
