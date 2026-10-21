@@ -37,6 +37,8 @@ interface NewTransactionModalProps {
   prefilledKategori?: string;
   prefilledHarga?: number;
   prefilledLamaHari?: number;
+  prefilledStartDate?: string;
+  prefilledStatusUnit?: 'Disewa' | 'Booking';
 }
 
 export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
@@ -51,7 +53,9 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
   prefilledTipe,
   prefilledKategori,
   prefilledHarga,
-  prefilledLamaHari
+  prefilledLamaHari,
+  prefilledStartDate,
+  prefilledStatusUnit
 }) => {
   const [namaPenyewa, setNamaPenyewa] = useState(prefilledCustomer?.nama || '');
   const [whatsapp, setWhatsapp] = useState(prefilledCustomer?.whatsapp || '');
@@ -71,22 +75,35 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
   const [customIdentitasText, setCustomIdentitasText] = useState('');
   const [nopolMotor, setNopolMotor] = useState(prefilledNopol || fleet[0]?.nopol || '');
   const [kategoriPelanggan, setKategoriPelanggan] = useState<CustomerCategory>('Mhs Malang');
-  const [waktuStartSewa, setWaktuStartSewa] = useState(toInputDateTimeLocal(new Date()));
-  const [lamaSewaHari, setLamaSewaHari] = useState(1);
-  const [paketKhusus, setPaketKhusus] = useState<'Harian' | 'Per Jam'>('Harian');
+  const [waktuStartSewa, setWaktuStartSewa] = useState(prefilledStartDate || toInputDateTimeLocal(new Date()));
+  const [lamaSewaHariInput, setLamaSewaHariInput] = useState<string>('1');
+  const [paketKhusus, setPaketKhusus] = useState<'Harian' | 'Paket 12 Jam' | 'Per Jam'>('Harian');
+  const [hargaPaket12JamInput, setHargaPaket12JamInput] = useState<string>('');
   const [durasiJam, setDurasiJam] = useState<number>(1);
   const [tambahanJam, setTambahanJam] = useState<number>(0);
-  const [hargaPerHari, setHargaPerHari] = useState(55000);
+  const [hargaPerHariInput, setHargaPerHariInput] = useState<string>('55000');
   const [statusBayar, setStatusBayar] = useState<PaymentStatus>('Lunas');
   const [metodePembayaran, setMetodePembayaran] = useState<PaymentMethod>('Tunai');
   const [copiedBri, setCopiedBri] = useState(false);
   const [showQrisZoom, setShowQrisZoom] = useState(false);
-  const [statusUnit, setStatusUnit] = useState<'Disewa' | 'Booking'>('Disewa');
+  const [statusUnit, setStatusUnit] = useState<'Disewa' | 'Booking'>(prefilledStatusUnit || 'Disewa');
   
   // Specific rental inclusions: 0/1/2 helmets, bensin 1/2/3/4/5/Full kotak
   const [jumlahHelm, setJumlahHelm] = useState<'0' | '1' | '2'>('2');
   const [bensinAwal, setBensinAwal] = useState('1 Kotak');
   const [catatanJaminanTambahan, setCatatanJaminanTambahan] = useState('');
+
+  const lamaSewaHari = lamaSewaHariInput.trim() === ''
+    ? 0
+    : Math.max(0, parseInt(lamaSewaHariInput, 10) || 0);
+
+  const hargaPerHari = hargaPerHariInput.trim() === ''
+    ? 0
+    : Math.max(0, parseInt(hargaPerHariInput, 10) || 0);
+
+  const hargaPaket12Jam = hargaPaket12JamInput.trim() === ''
+    ? 0
+    : Math.max(0, parseInt(hargaPaket12JamInput, 10) || 0);
 
   const applyIdentitasValue = (val: string) => {
     if (STANDARD_IDENTITAS_OPTIONS.includes(val)) {
@@ -118,9 +135,11 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
       applyRecommendedRate(prefilledNopol, prefilledKategori ? (prefilledKategori as CustomerCategory) : kategoriPelanggan);
     }
     if (prefilledKategori) setKategoriPelanggan(prefilledKategori as CustomerCategory);
-    if (prefilledHarga) setHargaPerHari(prefilledHarga);
-    if (prefilledLamaHari) setLamaSewaHari(prefilledLamaHari);
-  }, [prefilledCustomer, prefilledNopol, prefilledKategori, prefilledHarga, prefilledLamaHari]);
+    if (prefilledHarga !== undefined) setHargaPerHariInput(String(prefilledHarga));
+    if (prefilledLamaHari !== undefined) setLamaSewaHariInput(String(prefilledLamaHari));
+    if (prefilledStartDate) setWaktuStartSewa(prefilledStartDate);
+    if (prefilledStatusUnit) setStatusUnit(prefilledStatusUnit);
+  }, [prefilledCustomer, prefilledNopol, prefilledKategori, prefilledHarga, prefilledLamaHari, prefilledStartDate, prefilledStatusUnit, isOpen]);
 
   // Auto calculate tariff recommendation when motor or category changes
   const applyRecommendedRate = (nopol: string, kategori: CustomerCategory) => {
@@ -130,13 +149,9 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
     if (!tarif) return;
 
     if (kategori === 'Mhs Malang') {
-      setHargaPerHari(tarif.mhsMalang24Jam);
+      setHargaPerHariInput(String(tarif.mhsMalang24Jam));
     } else if (kategori === 'Luar Malang / Wisatawan') {
-      setHargaPerHari(tarif.luarMalang24Jam);
-    } else if (kategori === 'Paket Mingguan') {
-      setHargaPerHari(Math.round(tarif.paketMinggu / 7));
-    } else if (kategori === 'Paket Bulanan') {
-      setHargaPerHari(Math.round(tarif.paketBulan / 30));
+      setHargaPerHariInput(String(tarif.luarMalang24Jam));
     }
   };
 
@@ -148,14 +163,9 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
   const handleKategoriChange = (newKategori: CustomerCategory) => {
     setKategoriPelanggan(newKategori);
     applyRecommendedRate(nopolMotor, newKategori);
-    if (newKategori === 'Paket Mingguan' && lamaSewaHari < 7) {
-      setLamaSewaHari(7);
-    } else if (newKategori === 'Paket Bulanan' && lamaSewaHari < 30) {
-      setLamaSewaHari(30);
-    }
   };
 
-  // Calculations & Pricing with Hourly Rental (<12h) & Hourly Overtime
+  // Calculations & Pricing with Hourly Rental (<12h), Paket 12 Jam (Optional Price), & Hourly Overtime
   const ratePerJam = calculateHourlyOvertimeFee(durasiJam);
   const biayaTambahanJam = calculateHourlyOvertimeFee(tambahanJam);
 
@@ -169,6 +179,10 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
     calculatedReturnIso = calculateEstimatedReturnWithHours(waktuStartSewa, 0, durasiJam);
     basePrice = ratePerJam;
     totalPemasukan = ratePerJam;
+  } else if (paketKhusus === 'Paket 12 Jam') {
+    calculatedReturnIso = calculateEstimatedReturnWithHours(waktuStartSewa, lamaSewaHari, 12 + tambahanJam);
+    basePrice = (lamaSewaHari * hargaPerHari) + hargaPaket12Jam;
+    totalPemasukan = basePrice + biayaTambahanJam;
   } else {
     calculatedReturnIso = calculateEstimatedReturnWithHours(waktuStartSewa, lamaSewaHari, tambahanJam);
     basePrice = lamaSewaHari * hargaPerHari;
@@ -192,6 +206,10 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
     const idYear = !isNaN(startObj.getFullYear()) ? startObj.getFullYear() : activeBookYear;
     const newId = `TRX-${idYear}-${Math.floor(100 + Math.random() * 900)}`;
 
+    const paket12Note = paketKhusus === 'Paket 12 Jam'
+      ? ` [Paket 12 Jam: ${hargaPaket12Jam > 0 ? formatRupiah(hargaPaket12Jam) : 'Harga Opsional Rp 0'}]`
+      : '';
+
     const newTrx: TransaksiSewa = {
       id: newId,
       namaPenyewa: namaPenyewa.trim(),
@@ -205,12 +223,15 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
       lamaSewaHari: paketKhusus === 'Per Jam' 
         ? Number((durasiJam / 24).toFixed(2)) 
         : Number(lamaSewaHari),
-      durasiJam: paketKhusus === 'Per Jam' ? durasiJam : undefined,
+      durasiJam: paketKhusus === 'Per Jam' ? durasiJam : paketKhusus === 'Paket 12 Jam' ? 12 : undefined,
       tambahanJam: paketKhusus !== 'Per Jam' && tambahanJam > 0 ? tambahanJam : undefined,
       paketKhusus: paketKhusus,
+      hargaPaket12Jam: paketKhusus === 'Paket 12 Jam' ? hargaPaket12Jam : undefined,
       estWaktuKembali: calculatedReturnIso,
       hargaPerHari: paketKhusus === 'Per Jam' 
         ? ratePerJam 
+        : paketKhusus === 'Paket 12 Jam' && lamaSewaHari === 0 && hargaPaket12Jam > 0
+        ? hargaPaket12Jam
         : Number(hargaPerHari),
       totalPemasukan: Number(totalPemasukan),
       statusBayar,
@@ -218,7 +239,7 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
       statusUnit,
       jumlahHelm,
       levelBensin: bensinAwal as '1 Kotak' | '2 Kotak' | '3 Kotak' | '4 Kotak' | '5 Kotak' | 'Full Kotak',
-      catatanJaminanTambahan: `${jumlahHelm === '0' ? '0 Helm (Bawa Sendiri)' : `${jumlahHelm} Helm SNI`}, Bensin: ${bensinAwal}, Bayar: ${metodePembayaran}${paketKhusus === 'Per Jam' ? ` [Sewa Per Jam: ${durasiJam} Jam]` : ''}${tambahanJam > 0 && paketKhusus !== 'Per Jam' ? ` [Tambahan ${tambahanJam} Jam: +${formatRupiah(biayaTambahanJam)}]` : ''}${catatanJaminanTambahan.trim() ? ` (${catatanJaminanTambahan.trim()})` : ''}`
+      catatanJaminanTambahan: `${jumlahHelm === '0' ? '0 Helm (Bawa Sendiri)' : `${jumlahHelm} Helm SNI`}, Bensin: ${bensinAwal}, Bayar: ${metodePembayaran}${paketKhusus === 'Per Jam' ? ` [Sewa Per Jam: ${durasiJam} Jam]` : ''}${paket12Note}${tambahanJam > 0 && paketKhusus !== 'Per Jam' ? ` [Tambahan ${tambahanJam} Jam: +${formatRupiah(biayaTambahanJam)}]` : ''}${catatanJaminanTambahan.trim() ? ` (${catatanJaminanTambahan.trim()})` : ''}`
     };
 
     onSave(newTrx);
@@ -425,8 +446,6 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
                 >
                   <option value="Mhs Malang">Mhs Malang (Mahasiswa Malang)</option>
                   <option value="Luar Malang / Wisatawan">Luar Malang / Wisatawan</option>
-                  <option value="Paket Mingguan">Paket Mingguan (Hemat 7 Hari)</option>
-                  <option value="Paket Bulanan">Paket Bulanan (30 Hari)</option>
                 </select>
               </div>
             </div>
@@ -438,16 +457,16 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
                 3. Jadwal &amp; Durasi Sewa
               </div>
               <span className="text-[11px] text-slate-400">
-                Pilih Sewa Per Jam (&lt; 12 Jam) atau Harian
+                Per Jam (&lt; 12 Jam), Paket 12 Jam, atau Harian
               </span>
             </div>
 
             {/* Pilihan Paket Sewa */}
-            <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
               <button
                 type="button"
                 onClick={() => setPaketKhusus('Per Jam')}
-                className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold transition-all ${
+                className={`py-1.5 px-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   paketKhusus === 'Per Jam'
                     ? 'bg-emerald-400 text-slate-950 shadow-sm'
                     : 'text-slate-400 hover:text-white'
@@ -457,8 +476,29 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setPaketKhusus('Harian')}
-                className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-semibold transition-all ${
+                onClick={() => {
+                  setPaketKhusus('Paket 12 Jam');
+                  if (lamaSewaHari === 1) {
+                    setLamaSewaHariInput('0');
+                  }
+                }}
+                className={`py-1.5 px-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  paketKhusus === 'Paket 12 Jam'
+                    ? 'bg-amber-400 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                🌗 Paket Sewa 12 Jam
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPaketKhusus('Harian');
+                  if (lamaSewaHari === 0) {
+                    setLamaSewaHariInput('1');
+                  }
+                }}
+                className={`py-1.5 px-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   paketKhusus === 'Harian'
                     ? 'bg-cyan-400 text-slate-950 shadow-sm'
                     : 'text-slate-400 hover:text-white'
@@ -514,18 +554,52 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
               ) : (
                 <>
                   <div>
-                    <label className="block text-slate-300 font-medium mb-1">
-                      Lama Sewa (Hari) *
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-slate-300 font-medium">
+                        Lama Sewa (Hari)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setLamaSewaHariInput('0')}
+                        className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 hover:bg-rose-950/80 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-700 transition-colors cursor-pointer"
+                        title="Hapus menjadi 0 Hari"
+                      >
+                        Hapus / 0 Hari
+                      </button>
+                    </div>
                     <input
                       type="number"
-                      min="1"
+                      min="0"
                       max="90"
-                      required
-                      value={lamaSewaHari}
-                      onChange={e => setLamaSewaHari(Math.max(1, parseInt(e.target.value) || 1))}
+                      placeholder="0"
+                      value={lamaSewaHariInput}
+                      onChange={e => {
+                        const raw = e.target.value;
+                        if (raw === '') {
+                          setLamaSewaHariInput('');
+                        } else {
+                          const parsed = parseInt(raw, 10);
+                          setLamaSewaHariInput(isNaN(parsed) ? '' : String(Math.max(0, parsed)));
+                        }
+                      }}
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:border-cyan-500 outline-none font-mono"
                     />
+                    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                      {[0, 1, 2, 3, 4, 5].map(d => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setLamaSewaHariInput(String(d))}
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold border transition-colors cursor-pointer ${
+                            lamaSewaHari === d
+                              ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {d} Hr
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-slate-300 font-medium mb-1 flex items-center justify-between">
@@ -555,12 +629,127 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
               )}
             </div>
 
+            {/* Panel Paket Sewa 12 Jam dengan Harga Opsional */}
+            {paketKhusus !== 'Per Jam' && (
+              <div className={`p-3.5 rounded-xl border transition-all space-y-2.5 ${
+                paketKhusus === 'Paket 12 Jam'
+                  ? 'bg-amber-950/30 border-amber-500/60'
+                  : 'bg-slate-950/70 border-slate-800'
+              }`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (paketKhusus === 'Paket 12 Jam') {
+                          setPaketKhusus('Harian');
+                        } else {
+                          setPaketKhusus('Paket 12 Jam');
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        paketKhusus === 'Paket 12 Jam'
+                          ? 'bg-amber-400 text-slate-950 shadow-sm'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                      }`}
+                    >
+                      <span>🌗</span>
+                      <span>
+                        {paketKhusus === 'Paket 12 Jam'
+                          ? '✓ Paket Sewa 12 Jam Aktif (+12 Jam)'
+                          : 'Aktifkan Paket Sewa 12 Jam'}
+                      </span>
+                    </button>
+                    <span className="text-[11px] text-slate-400">
+                      {lamaSewaHari === 0
+                        ? 'Sewa 12 Jam (0 Hari)'
+                        : `${lamaSewaHari} Hari + 12 Jam`}
+                    </span>
+                  </div>
+                  {paketKhusus === 'Paket 12 Jam' && (
+                    <span className="text-xs font-mono font-bold text-amber-300">
+                      Tarif 12 Jam: {hargaPaket12Jam > 0 ? formatRupiah(hargaPaket12Jam) : 'Rp 0 (Opsional)'}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-center pt-1">
+                  <div>
+                    <label className="block text-slate-300 text-[11px] font-medium mb-1">
+                      Harga Paket 12 Jam (Rp) — <span className="text-amber-300 font-semibold">Opsional</span>
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min="0"
+                        step="5000"
+                        placeholder="Opsional (Misal: 35000 / 40000 atau kosongkan)"
+                        value={hargaPaket12JamInput}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setHargaPaket12JamInput(val);
+                          if (val.trim() !== '' && paketKhusus !== 'Paket 12 Jam') {
+                            setPaketKhusus('Paket 12 Jam');
+                          }
+                        }}
+                        className="w-full bg-slate-950 border border-slate-700 focus:border-amber-400 rounded-lg px-3 py-1.5 text-white outline-none font-mono text-xs"
+                      />
+                      {hargaPaket12JamInput !== '' && (
+                        <button
+                          type="button"
+                          onClick={() => setHargaPaket12JamInput('')}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium shrink-0 cursor-pointer"
+                          title="Kosongkan harga paket 12 jam"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[10px] text-slate-400 mb-1">
+                      Pilihan Cepat Harga Paket 12 Jam (Opsional):
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {[
+                        { label: 'Rp 0 (Opsional)', val: '' },
+                        { label: '30rb', val: '30000' },
+                        { label: '35rb', val: '35000' },
+                        { label: '40rb', val: '40000' },
+                        { label: '45rb', val: '45000' },
+                        { label: '50rb', val: '50000' },
+                      ].map(preset => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => {
+                            setPaketKhusus('Paket 12 Jam');
+                            setHargaPaket12JamInput(preset.val);
+                          }}
+                          className={`px-2 py-1 rounded text-[10px] font-mono font-semibold border transition-colors cursor-pointer ${
+                            paketKhusus === 'Paket 12 Jam' && hargaPaket12JamInput === preset.val
+                              ? 'bg-amber-400/20 border-amber-400 text-amber-300'
+                              : 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Estimated return banner */}
             <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-1">
               <span className="text-slate-400">
                 Estimasi Pengembalian ({calculatedDay}, {
                   paketKhusus === 'Per Jam' 
                     ? `${durasiJam} Jam` 
+                    : paketKhusus === 'Paket 12 Jam'
+                    ? `${lamaSewaHari} Hari + Paket 12 Jam`
                     : `${lamaSewaHari} Hari`
                 }{tambahanJam > 0 && paketKhusus !== 'Per Jam' ? ` + ${tambahanJam} Jam` : ''}):
               </span>
@@ -572,20 +761,28 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
 
           <div className="border-t border-slate-800 pt-3 space-y-3">
             <div className="text-[11px] uppercase tracking-wider font-semibold text-cyan-400">
-              4. Tarif & Pembayaran
+              4. Tarif &amp; Pembayaran
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-slate-300 font-medium mb-1">
-                  Harga / Hari (Rp) *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-slate-300 font-medium">
+                    Harga / Hari (Rp)
+                  </label>
+                  {lamaSewaHari === 0 && paketKhusus !== 'Per Jam' && (
+                    <span className="text-[10px] font-mono text-amber-300">
+                      0 Hari = Rp 0
+                    </span>
+                  )}
+                </div>
                 <input
                   type="number"
+                  min="0"
                   step="5000"
-                  required
-                  value={hargaPerHari}
-                  onChange={e => setHargaPerHari(parseInt(e.target.value) || 0)}
+                  placeholder="0"
+                  value={hargaPerHariInput}
+                  onChange={e => setHargaPerHariInput(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:border-cyan-500 outline-none font-mono"
                 />
               </div>
@@ -849,6 +1046,8 @@ export const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
                 <div className="text-xs text-slate-400">
                   {paketKhusus === 'Per Jam'
                     ? `Sewa Per Jam (${durasiJam} Jam: ${formatRupiah(ratePerJam)})`
+                    : paketKhusus === 'Paket 12 Jam'
+                    ? `${lamaSewaHari} Hari (${formatRupiah(lamaSewaHari * hargaPerHari)}) + Paket 12 Jam (${hargaPaket12Jam > 0 ? formatRupiah(hargaPaket12Jam) : 'Rp 0 Opsional'})`
                     : `${lamaSewaHari} Hari x ${formatRupiah(hargaPerHari)}`}
                   {tambahanJam > 0 && paketKhusus !== 'Per Jam' && ` + Tambahan ${tambahanJam} Jam (${formatRupiah(biayaTambahanJam)})`}
                 </div>

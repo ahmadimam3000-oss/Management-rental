@@ -1,17 +1,17 @@
 import type { MotorMaster, TarifAcuan, TransaksiSewa, PengeluaranMotor, FrequentRenter } from '../types/rental.ts';
 
 export const INITIAL_FLEET: MotorMaster[] = [
-  { no: 1, namaUnit: "BEAT 1", nopol: "L 2054 C", tipeMotor: "Honda Beat", status: "Disewa", tahun: 2022, warna: "Hitam Glossy", kilometer: 24350 },
+  { no: 1, namaUnit: "BEAT 1", nopol: "L 2054 C", tipeMotor: "Honda Beat", status: "Tersedia", tahun: 2022, warna: "Hitam Glossy", kilometer: 24350 },
   { no: 2, namaUnit: "BEAT 2", nopol: "N 4849 ACC", tipeMotor: "Honda Beat", status: "Tersedia", tahun: 2023, warna: "Merah Hitam", kilometer: 18420 },
-  { no: 3, namaUnit: "BEAT 3", nopol: "N 6836 TDV", tipeMotor: "Honda Beat", status: "Disewa", tahun: 2023, warna: "Biru Putih", kilometer: 19100 },
+  { no: 3, namaUnit: "BEAT 3", nopol: "N 6836 TDV", tipeMotor: "Honda Beat", status: "Tersedia", tahun: 2023, warna: "Biru Putih", kilometer: 19100 },
   { no: 4, namaUnit: "BEAT 4", nopol: "N 3575 VAS", tipeMotor: "Honda Beat", status: "Tersedia", tahun: 2022, warna: "Hitam Doff", kilometer: 28900 },
-  { no: 5, namaUnit: "BEAT 5", nopol: "N 4961 EDF", tipeMotor: "Honda Beat", status: "Overdue", tahun: 2023, warna: "Silver Doff", kilometer: 16750 },
+  { no: 5, namaUnit: "BEAT 5", nopol: "N 4961 EDF", tipeMotor: "Honda Beat", status: "Tersedia", tahun: 2023, warna: "Silver Doff", kilometer: 16750 },
   { no: 6, namaUnit: "BEAT 6", nopol: "W 6365 NDT", tipeMotor: "Honda Beat", status: "Tersedia", tahun: 2024, warna: "Putih", kilometer: 9800 },
-  { no: 7, namaUnit: "FAZIO", nopol: "S 4616 NBQ", tipeMotor: "Yamaha Fazzio", status: "Disewa", tahun: 2023, warna: "Tosca / Neo Cyan", kilometer: 15300 },
-  { no: 8, namaUnit: "FAZIO M 1", nopol: "N 3711 VAJ", tipeMotor: "Yamaha Fazzio", status: "Booking", tahun: 2023, warna: "Hitam Neo", kilometer: 14200 },
+  { no: 7, namaUnit: "FAZIO", nopol: "S 4616 NBQ", tipeMotor: "Yamaha Fazzio", status: "Tersedia", tahun: 2023, warna: "Tosca / Neo Cyan", kilometer: 15300 },
+  { no: 8, namaUnit: "FAZIO M 1", nopol: "N 3711 VAJ", tipeMotor: "Yamaha Fazzio", status: "Tersedia", tahun: 2023, warna: "Hitam Neo", kilometer: 14200 },
   { no: 9, namaUnit: "FAZIO M 2", nopol: "P 2409 BO", tipeMotor: "Yamaha Fazzio", status: "Tersedia", tahun: 2023, warna: "Merah Neo", kilometer: 17800 },
   { no: 10, namaUnit: "FAZIO M 3", nopol: "L 6312 ABH", tipeMotor: "Yamaha Fazzio", status: "Tersedia", tahun: 2024, warna: "Putih Mutiara", kilometer: 8900 },
-  { no: 11, namaUnit: "SCOPY 1", nopol: "N 3541 EDB", tipeMotor: "Honda Scoopy", status: "Disewa", tahun: 2023, warna: "Prestige White", kilometer: 21400 },
+  { no: 11, namaUnit: "SCOPY 1", nopol: "N 3541 EDB", tipeMotor: "Honda Scoopy", status: "Tersedia", tahun: 2023, warna: "Prestige White", kilometer: 21400 },
   { no: 12, namaUnit: "SCOPY 2", nopol: "P 5564 MI", tipeMotor: "Honda Scoopy", status: "Tersedia", tahun: 2022, warna: "Fashion Brown", kilometer: 26100 },
   { no: 13, namaUnit: "MIO J", nopol: "N 5540 GH", tipeMotor: "Yamaha Mio J", status: "Tersedia", tahun: 2020, warna: "Hitam Merah", kilometer: 42100 }
 ];
@@ -20,446 +20,30 @@ export const TARIF_STANDAR: TarifAcuan[] = [
   {
     tipeMotor: "Yamaha Mio J",
     mhsMalang24Jam: 45000,
-    luarMalang24Jam: 60000,
-    paketMinggu: 350000,
-    paketBulan: 1100000
+    luarMalang24Jam: 60000
   },
   {
     tipeMotor: "Honda Beat",
     mhsMalang24Jam: 55000,
-    luarMalang24Jam: 70000,
-    paketMinggu: 350000,
-    paketBulan: 1100000
+    luarMalang24Jam: 70000
   },
   {
     tipeMotor: "Honda Scoopy",
     mhsMalang24Jam: 65000,
-    luarMalang24Jam: 80000,
-    paketMinggu: 350000,
-    paketBulan: 1100000
+    luarMalang24Jam: 80000
   },
   {
     tipeMotor: "Yamaha Fazzio",
     mhsMalang24Jam: 65000,
-    luarMalang24Jam: 80000,
-    paketMinggu: 350000,
-    paketBulan: 1100000
+    luarMalang24Jam: 80000
   }
 ];
 
-export const INITIAL_TRANSACTIONS: TransaksiSewa[] = [
-  {
-    id: "TRX-2026-001",
-    namaPenyewa: "Dimas Arya Pratama",
-    whatsapp: "6281234567890",
-    alamatAsalKos: "Kos Putra Sigura-gura Gg. 3 No. 12, Lowokwaru",
-    identitasDijaminkan: "KTM (Kartu Tanda Mahasiswa)",
-    nopolMotor: "L 2054 C",
-    kategoriPelanggan: "Mhs Malang",
-    hariSewa: "Senin",
-    waktuStartSewa: "2026-10-19T08:30:00",
-    lamaSewaHari: 3,
-    estWaktuKembali: "2026-10-22T08:30:00",
-    hargaPerHari: 55000,
-    totalPemasukan: 165000,
-    statusBayar: "Lunas",
-    metodePembayaran: "QRIS",
-    statusUnit: "Disewa",
-    jumlahHelm: "2",
-    levelBensin: "3 Kotak",
-    catatanJaminanTambahan: "Helm 2 pcs (INK Hitam + Bogo)"
-  },
-  {
-    id: "TRX-2026-002",
-    namaPenyewa: "Sarah Amelia",
-    whatsapp: "6282198765432",
-    alamatAsalKos: "Hotel Santika Premiere, Jl. Letjen Sutoyo No. 79",
-    identitasDijaminkan: "KTP Asli",
-    nopolMotor: "S 4616 NBQ",
-    kategoriPelanggan: "Luar Malang / Wisatawan",
-    hariSewa: "Minggu",
-    waktuStartSewa: "2026-10-18T14:00:00",
-    lamaSewaHari: 4,
-    estWaktuKembali: "2026-10-22T14:00:00",
-    hargaPerHari: 80000,
-    totalPemasukan: 320000,
-    statusBayar: "Lunas",
-    metodePembayaran: "Transfer BRI",
-    statusUnit: "Disewa",
-    jumlahHelm: "2",
-    levelBensin: "Full Kotak",
-    catatanJaminanTambahan: "Wisata Bromo & Batu. Helm 2 pcs + Holder HP dipasang"
-  },
-  {
-    id: "TRX-2026-003",
-    namaPenyewa: "Bagus Wicaksono",
-    whatsapp: "6285712344321",
-    alamatAsalKos: "Kos Graha Dewandaru Kav. 4B, Jatimulyo",
-    identitasDijaminkan: "SIM C + KTP",
-    nopolMotor: "N 6836 TDV",
-    kategoriPelanggan: "Mhs Malang",
-    hariSewa: "Sabtu",
-    waktuStartSewa: "2026-10-17T10:00:00",
-    lamaSewaHari: 5,
-    estWaktuKembali: "2026-10-22T10:00:00",
-    hargaPerHari: 55000,
-    totalPemasukan: 275000,
-    statusBayar: "Lunas",
-    metodePembayaran: "Tunai",
-    statusUnit: "Disewa",
-    jumlahHelm: "1",
-    levelBensin: "2 Kotak",
-    catatanJaminanTambahan: "Helm 1 pc + Kunci Gembok Cakram"
-  },
-  {
-    id: "TRX-2026-004",
-    namaPenyewa: "Fathur Rohman",
-    whatsapp: "6281356789900",
-    alamatAsalKos: "Jl. Bendungan Sutami No. 15A, Sumbersari",
-    identitasDijaminkan: "KTM (Kartu Tanda Mahasiswa)",
-    nopolMotor: "N 4961 EDF",
-    kategoriPelanggan: "Mhs Malang",
-    hariSewa: "Jumat",
-    waktuStartSewa: "2026-10-16T09:00:00",
-    lamaSewaHari: 3,
-    estWaktuKembali: "2026-10-19T09:00:00", // Telat / Overdue!
-    hargaPerHari: 55000,
-    totalPemasukan: 165000,
-    statusBayar: "Lunas",
-    metodePembayaran: "Tunai",
-    statusUnit: "Overdue",
-    jumlahHelm: "1",
-    levelBensin: "1 Kotak",
-    catatanJaminanTambahan: "KTM UB Malang. Belum konfirmasi perpanjangan, sudah lewat jadwal kembali."
-  },
-  {
-    id: "TRX-2026-005",
-    namaPenyewa: "Nadia Kusuma",
-    whatsapp: "6287711223344",
-    alamatAsalKos: "Ibis Styles Hotel, Jl. S. Parman Malang",
-    identitasDijaminkan: "KTP Asli",
-    nopolMotor: "N 3541 EDB",
-    kategoriPelanggan: "Luar Malang / Wisatawan",
-    hariSewa: "Selasa",
-    waktuStartSewa: "2026-10-20T07:30:00",
-    lamaSewaHari: 2,
-    estWaktuKembali: "2026-10-22T07:30:00",
-    hargaPerHari: 80000,
-    totalPemasukan: 160000,
-    statusBayar: "Lunas",
-    metodePembayaran: "QRIS",
-    statusUnit: "Disewa",
-    jumlahHelm: "2",
-    levelBensin: "4 Kotak",
-    catatanJaminanTambahan: "KTP Jakarta Selatan. Helm 2 pcs Retro Cream"
-  },
-  {
-    id: "TRX-2026-006",
-    namaPenyewa: "Rizki Hidayat",
-    whatsapp: "6289655443322",
-    alamatAsalKos: "Stasiun Kotabaru Malang (Booking Kereta Jam 14:00)",
-    identitasDijaminkan: "KTP Asli",
-    nopolMotor: "N 3711 VAJ",
-    kategoriPelanggan: "Luar Malang / Wisatawan",
-    hariSewa: "Rabu",
-    waktuStartSewa: "2026-10-21T14:00:00",
-    lamaSewaHari: 3,
-    estWaktuKembali: "2026-10-24T14:00:00",
-    hargaPerHari: 80000,
-    totalPemasukan: 240000,
-    statusBayar: "DP / Sebagian",
-    metodePembayaran: "Transfer BRI",
-    statusUnit: "Booking",
-    jumlahHelm: "2",
-    levelBensin: "3 Kotak",
-    catatanJaminanTambahan: "DP Rp 100.000 via Transfer BRI 603201007355508 An Ahmad imam makhali. Unit minta diantar ke Stasiun Kotabaru."
-  },
-  {
-    id: "TRX-2026-007",
-    namaPenyewa: "Agus Prasetyo",
-    whatsapp: "6282244668800",
-    alamatAsalKos: "Kos Green House, Jl. Kerto Raharjo, Ketawanggede",
-    identitasDijaminkan: "KTM (Kartu Tanda Mahasiswa)",
-    nopolMotor: "W 6365 NDT",
-    kategoriPelanggan: "Mhs Malang",
-    hariSewa: "Kamis",
-    waktuStartSewa: "2026-10-15T13:00:00",
-    lamaSewaHari: 4,
-    estWaktuKembali: "2026-10-19T13:00:00",
-    waktuSelesai: "2026-10-19T12:45:00",
-    hargaPerHari: 55000,
-    totalPemasukan: 220000,
-    statusBayar: "Lunas",
-    metodePembayaran: "Tunai",
-    statusUnit: "Selesai",
-    jumlahHelm: "1",
-    levelBensin: "Full Kotak",
-    catatanJaminanTambahan: "Dikembalikan tepat waktu, bensin penuh kembali, kondisi mulus."
-  },
-  {
-    id: "TRX-2026-008",
-    namaPenyewa: "Jessica Tanuwijaya",
-    whatsapp: "6281133445566",
-    alamatAsalKos: "Apartemen Begawan, Jl. Raya Tlogomas",
-    identitasDijaminkan: "KTP Asli",
-    nopolMotor: "P 5564 MI",
-    kategoriPelanggan: "Paket Mingguan",
-    hariSewa: "Senin",
-    waktuStartSewa: "2026-10-12T10:00:00",
-    lamaSewaHari: 7,
-    estWaktuKembali: "2026-10-19T10:00:00",
-    waktuSelesai: "2026-10-19T09:30:00",
-    hargaPerHari: 50000, // Paket Mingguan Rp 350.000 / 7 = 50.000/hari
-    totalPemasukan: 350000,
-    statusBayar: "Lunas",
-    metodePembayaran: "Transfer BRI",
-    statusUnit: "Selesai",
-    jumlahHelm: "2",
-    levelBensin: "5 Kotak",
-    catatanJaminanTambahan: "Paket 1 Minggu. Unit bersih kembali."
-  },
-  {
-    id: "TRX-2026-009",
-    namaPenyewa: "Kurniawan Dwi",
-    whatsapp: "6285233669911",
-    alamatAsalKos: "Jl. MT Haryono No. 193, Dinoyo",
-    identitasDijaminkan: "SIM C + KTP",
-    nopolMotor: "N 5540 GH",
-    kategoriPelanggan: "Mhs Malang",
-    hariSewa: "Jumat",
-    waktuStartSewa: "2026-10-09T08:00:00",
-    lamaSewaHari: 6,
-    estWaktuKembali: "2026-10-15T08:00:00",
-    waktuSelesai: "2026-10-15T07:50:00",
-    hargaPerHari: 45000,
-    totalPemasukan: 270000,
-    statusBayar: "Lunas",
-    metodePembayaran: "QRIS",
-    statusUnit: "Selesai",
-    jumlahHelm: "0",
-    levelBensin: "2 Kotak",
-    catatanJaminanTambahan: "Unit Mio J lancar, rem pakem."
-  },
-  {
-    id: "TRX-2025-081",
-    namaPenyewa: "Alifia Zahra",
-    whatsapp: "6281299887766",
-    alamatAsalKos: "Jl. Gajayana No. 28, Dinoyo",
-    identitasDijaminkan: "KTM (Kartu Tanda Mahasiswa)",
-    nopolMotor: "N 4849 ACC",
-    kategoriPelanggan: "Mhs Malang",
-    hariSewa: "Kamis",
-    waktuStartSewa: "2025-11-13T09:00:00",
-    lamaSewaHari: 4,
-    estWaktuKembali: "2025-11-17T09:00:00",
-    waktuSelesai: "2025-11-17T08:45:00",
-    hargaPerHari: 55000,
-    totalPemasukan: 220000,
-    statusBayar: "Lunas",
-    statusUnit: "Selesai",
-    jumlahHelm: "1",
-    levelBensin: "3 Kotak",
-    catatanJaminanTambahan: "Rental tahun 2025 lancar"
-  },
-  {
-    id: "TRX-2025-082",
-    namaPenyewa: "Michael Wicaksono",
-    whatsapp: "6281344556677",
-    alamatAsalKos: "Whiz Prime Hotel Basuki Rahmat",
-    identitasDijaminkan: "KTP Asli",
-    nopolMotor: "L 6312 ABH",
-    kategoriPelanggan: "Luar Malang / Wisatawan",
-    hariSewa: "Jumat",
-    waktuStartSewa: "2025-12-19T10:00:00",
-    lamaSewaHari: 5,
-    estWaktuKembali: "2025-12-24T10:00:00",
-    waktuSelesai: "2025-12-24T09:30:00",
-    hargaPerHari: 80000,
-    totalPemasukan: 400000,
-    statusBayar: "Lunas",
-    statusUnit: "Selesai",
-    jumlahHelm: "2",
-    levelBensin: "Full Kotak",
-    catatanJaminanTambahan: "Liburan akhir tahun di Batu Malang"
-  },
-  {
-    id: "TRX-2025-083",
-    namaPenyewa: "Eko Prasetyo",
-    whatsapp: "6285611223344",
-    alamatAsalKos: "Kos Sigura-gura Barat",
-    identitasDijaminkan: "SIM C + KTP",
-    nopolMotor: "N 3575 VAS",
-    kategoriPelanggan: "Paket Mingguan",
-    hariSewa: "Senin",
-    waktuStartSewa: "2025-10-06T08:00:00",
-    lamaSewaHari: 7,
-    estWaktuKembali: "2025-10-13T08:00:00",
-    waktuSelesai: "2025-10-13T07:45:00",
-    hargaPerHari: 50000,
-    totalPemasukan: 350000,
-    statusBayar: "Lunas",
-    statusUnit: "Selesai",
-    jumlahHelm: "1",
-    levelBensin: "4 Kotak",
-    catatanJaminanTambahan: "Paket seminggu KKN"
-  }
-];
+export const INITIAL_TRANSACTIONS: TransaksiSewa[] = [];
 
-export const INITIAL_EXPENSES: PengeluaranMotor[] = [
-  {
-    id: "EXP-2026-001",
-    tanggal: "2026-10-10T14:30:00",
-    nopolMotor: "L 2054 C",
-    kategoriBiaya: "Service Rutin & Oli",
-    nominal: 85000,
-    keteranganBengkel: "AHASS Merjosari - Ganti Oli MPX2 + Cek Rem Depan",
-    penanggungJawab: "Mas Bambang (Admin Bengkel)"
-  },
-  {
-    id: "EXP-2026-002",
-    tanggal: "2026-10-12T11:00:00",
-    nopolMotor: "S 4616 NBQ",
-    kategoriBiaya: "Service Rutin & Oli",
-    nominal: 95000,
-    keteranganBengkel: "Yamaha SIP Malang - Ganti Oli Yamalube Power Matic",
-    penanggungJawab: "Rian (Staff Armada)"
-  },
-  {
-    id: "EXP-2026-003",
-    tanggal: "2026-10-14T16:00:00",
-    nopolMotor: "N 3541 EDB",
-    kategoriBiaya: "Sparepart & Ban",
-    nominal: 245000,
-    keteranganBengkel: "Planet Ban Soekarno Hatta - Ganti Ban Belakang Tubeless Planeto",
-    penanggungJawab: "Mas Bambang (Admin Bengkel)"
-  },
-  {
-    id: "EXP-2026-004",
-    tanggal: "2026-10-17T09:15:00",
-    nopolMotor: "W 6365 NDT",
-    kategoriBiaya: "Cuci Motor",
-    nominal: 20000,
-    keteranganBengkel: "Cuci Motor Salju 'Bersih Kilat' Dinoyo",
-    penanggungJawab: "Rian (Staff Armada)"
-  },
-  {
-    id: "EXP-2026-005",
-    tanggal: "2026-10-05T10:00:00",
-    nopolMotor: "N 5540 GH",
-    kategoriBiaya: "Pajak & STNK",
-    nominal: 220000,
-    keteranganBengkel: "Samsat Malang Kota - Perpanjangan Pajak Tahunan",
-    penanggungJawab: "Owner Rental"
-  },
-  {
-    id: "EXP-2026-006",
-    tanggal: "2026-10-18T17:00:00",
-    nopolMotor: "P 5564 MI",
-    kategoriBiaya: "Cuci Motor",
-    nominal: 20000,
-    keteranganBengkel: "Cuci Salju + Semir Ban",
-    penanggungJawab: "Rian (Staff Armada)"
-  },
-  {
-    id: "EXP-2025-045",
-    tanggal: "2025-11-15T10:00:00",
-    nopolMotor: "N 4849 ACC",
-    kategoriBiaya: "Service Rutin & Oli",
-    nominal: 80000,
-    keteranganBengkel: "AHASS Dinoyo - Servis berkala 2025",
-    penanggungJawab: "Mas Bambang"
-  },
-  {
-    id: "EXP-2025-046",
-    tanggal: "2025-12-20T14:00:00",
-    nopolMotor: "L 6312 ABH",
-    kategoriBiaya: "Cuci Motor",
-    nominal: 18000,
-    keteranganBengkel: "Cuci Salju Dinoyo",
-    penanggungJawab: "Rian"
-  }
-];
+export const INITIAL_EXPENSES: PengeluaranMotor[] = [];
 
-export const INITIAL_FREQUENT_RENTERS: FrequentRenter[] = [
-  {
-    id: "CUST-001",
-    nama: "Dimas Arya Pratama",
-    whatsapp: "6281234567890",
-    alamat: "Kos Putra Sigura-gura Gg. 3 No. 12, Lowokwaru",
-    identitasDefault: "KTM (Kartu Tanda Mahasiswa)",
-    kategoriDefault: "Mhs Malang",
-    totalRentals: 6,
-    totalSpent: 980000,
-    ratingTrust: 5,
-    lastRentalDate: "2026-10-19T08:30:00",
-    catatanKhusus: "Mahasiswa Teknik UB. Selalu tepat waktu dan mengembalikan motor dalam keadaan bersih."
-  },
-  {
-    id: "CUST-002",
-    nama: "Sarah Amelia",
-    whatsapp: "6282198765432",
-    alamat: "Hotel Santika Premiere, Jl. Letjen Sutoyo No. 79 (Asal Jakarta)",
-    identitasDefault: "KTP Asli",
-    kategoriDefault: "Luar Malang / Wisatawan",
-    totalRentals: 5,
-    totalSpent: 1600000,
-    ratingTrust: 5,
-    lastRentalDate: "2026-10-18T14:00:00",
-    catatanKhusus: "Travel blogger & fotografer rutin ke Bromo & Batu. Langganan Fazzio Tosca."
-  },
-  {
-    id: "CUST-003",
-    nama: "Jessica Tanuwijaya",
-    whatsapp: "6281133445566",
-    alamat: "Apartemen Begawan, Jl. Raya Tlogomas Kav. 8",
-    identitasDefault: "KTP Asli",
-    kategoriDefault: "Paket Mingguan",
-    totalRentals: 4,
-    totalSpent: 1400000,
-    ratingTrust: 5,
-    lastRentalDate: "2026-10-12T10:00:00",
-    catatanKhusus: "Penyewa paket mingguan loyal. Selalu bayar lunas di depan via BCA."
-  },
-  {
-    id: "CUST-004",
-    nama: "Bagus Wicaksono",
-    whatsapp: "6285712344321",
-    alamat: "Kos Graha Dewandaru Kav. 4B, Jatimulyo",
-    identitasDefault: "SIM C + KTP",
-    kategoriDefault: "Mhs Malang",
-    totalRentals: 4,
-    totalSpent: 715000,
-    ratingTrust: 5,
-    lastRentalDate: "2026-10-17T10:00:00",
-    catatanKhusus: "Mahasiswa UM. Sering rental Honda Beat untuk kegiatan organisasi kampus."
-  },
-  {
-    id: "CUST-005",
-    nama: "Kurniawan Dwi",
-    whatsapp: "6285233669911",
-    alamat: "Jl. MT Haryono No. 193, Dinoyo",
-    identitasDefault: "SIM C + KTP",
-    kategoriDefault: "Mhs Malang",
-    totalRentals: 3,
-    totalSpent: 540000,
-    ratingTrust: 4,
-    lastRentalDate: "2026-10-09T08:00:00",
-    catatanKhusus: "Mahasiswa UIN Malang. Biasa sewa Mio J atau Beat harian."
-  },
-  {
-    id: "CUST-006",
-    nama: "Nadia Kusuma",
-    whatsapp: "6287711223344",
-    alamat: "Ibis Styles Hotel, Jl. S. Parman Malang (Asal Surabaya)",
-    identitasDefault: "KTP Asli",
-    kategoriDefault: "Luar Malang / Wisatawan",
-    totalRentals: 3,
-    totalSpent: 480000,
-    ratingTrust: 5,
-    lastRentalDate: "2026-10-20T07:30:00",
-    catatanKhusus: "Dinas perbankan rutin setiap bulan di Malang. Mengutamakan Scoopy/Fazzio."
-  }
-];
+export const INITIAL_FREQUENT_RENTERS: FrequentRenter[] = [];
 
 export const GOOGLE_APPS_SCRIPT_SOURCE = `/**
  * System Manajemen Rental Motor & Keuangan (13 Fleet Unit)
@@ -530,22 +114,22 @@ function setupMasterMotor(sheet) {
   sheet.getRange(3, 1, motorData.length + 1, 5).setBorder(true, true, true, true, true, true);
 
   // TABEL ACUAN TARIF SEWA
-  sheet.getRange("G1:K1").merge().setValue("💵 TABEL ACUAN TARIF SEWA STANDAR")
+  sheet.getRange("G1:I1").merge().setValue("💵 TABEL ACUAN TARIF SEWA STANDAR")
        .setFontSize(12).setFontWeight("bold").setBackground("#2e75b6").setFontColor("#ffffff")
        .setHorizontalAlignment("center");
 
-  const tarifHeaders = [["Tipe Motor", "Mhs Malang / 24Jam", "Luar Malang / Wisatawan", "Paket 1 Minggu", "Paket 1 Bulan"]];
+  const tarifHeaders = [["Tipe Motor", "Mhs Malang / 24Jam", "Luar Malang / Wisatawan"]];
   const tarifData = [
-    ["Yamaha Mio J", 45000, 60000, 350000, 1100000],
-    ["Honda Beat", 55000, 70000, 350000, 1100000],
-    ["Honda Scoopy", 65000, 80000, 350000, 1100000],
-    ["Yamaha Fazzio", 65000, 80000, 350000, 1100000]
+    ["Yamaha Mio J", 45000, 60000],
+    ["Honda Beat", 55000, 70000],
+    ["Honda Scoopy", 65000, 80000],
+    ["Yamaha Fazzio", 65000, 80000]
   ];
 
-  sheet.getRange(3, 7, 1, 5).setValues(tarifHeaders).setFontWeight("bold").setBackground("#d9e1f2").setHorizontalAlignment("center");
-  sheet.getRange(4, 7, tarifData.length, 5).setValues(tarifData);
-  sheet.getRange("H4:K7").setNumberFormat("Rp#,##0");
-  sheet.getRange(3, 7, tarifData.length + 1, 5).setBorder(true, true, true, true, true, true);
+  sheet.getRange(3, 7, 1, 3).setValues(tarifHeaders).setFontWeight("bold").setBackground("#d9e1f2").setHorizontalAlignment("center");
+  sheet.getRange(4, 7, tarifData.length, 3).setValues(tarifData);
+  sheet.getRange("H4:I7").setNumberFormat("Rp#,##0");
+  sheet.getRange(3, 7, tarifData.length + 1, 3).setBorder(true, true, true, true, true, true);
 
   sheet.setColumnWidth(2, 110);
   sheet.setColumnWidth(3, 130);
@@ -553,8 +137,6 @@ function setupMasterMotor(sheet) {
   sheet.setColumnWidth(7, 130);
   sheet.setColumnWidth(8, 150);
   sheet.setColumnWidth(9, 170);
-  sheet.setColumnWidth(10, 140);
-  sheet.setColumnWidth(11, 140);
 }
 
 function setupTransaksiSewa(sheet) {
@@ -609,9 +191,7 @@ function setupTransaksiSewa(sheet) {
   // Dropdown Kategori Pelanggan (Kolom G)
   const ruleKategori = SpreadsheetApp.newDataValidation().requireValueInList([
     'Mhs Malang', 
-    'Luar Malang / Wisatawan', 
-    'Paket Mingguan', 
-    'Paket Bulanan'
+    'Luar Malang / Wisatawan'
   ]).build();
   sheet.getRange("G4:G100").setDataValidation(ruleKategori);
 

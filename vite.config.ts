@@ -1,5 +1,6 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import fs from 'fs';
 import path from 'path';
 import {defineConfig} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
@@ -8,6 +9,43 @@ export default defineConfig(() => {
   return {
     base: './',
     plugins: [
+      {
+        name: 'disable-vite-hmr-websocket',
+        enforce: 'post',
+        transform(code, id) {
+          if (id.includes('vite/dist/client/client.mjs')) {
+            return code.replace(
+              /const createWebSocketModuleRunnerTransport = \([^)]*\) => \{[\s\S]*?\/\/#endregion/,
+              'const createWebSocketModuleRunnerTransport = () => ({ async connect() {}, disconnect() {}, send() {} });\n//#endregion'
+            );
+          }
+          return null;
+        },
+      },
+      {
+        name: 'sync-live-bundle',
+        closeBundle() {
+          try {
+            const distAssetsDir = path.resolve(import.meta.dirname, 'dist/assets');
+            const liveBundleDir = path.resolve(import.meta.dirname, 'live-bundle');
+            if (!fs.existsSync(distAssetsDir)) return;
+            if (!fs.existsSync(liveBundleDir)) {
+              fs.mkdirSync(liveBundleDir, {recursive: true});
+            }
+            const files = fs.readdirSync(distAssetsDir);
+            const jsFile = files.find((f) => f.startsWith('index-') && f.endsWith('.js'));
+            const cssFile = files.find((f) => f.startsWith('index-') && f.endsWith('.css'));
+            if (jsFile) {
+              fs.copyFileSync(path.join(distAssetsDir, jsFile), path.join(liveBundleDir, 'app.js'));
+            }
+            if (cssFile) {
+              fs.copyFileSync(path.join(distAssetsDir, cssFile), path.join(liveBundleDir, 'app.css'));
+            }
+          } catch (err) {
+            console.warn('Failed to sync live-bundle:', err);
+          }
+        },
+      },
       react(),
       tailwindcss(),
       VitePWA({

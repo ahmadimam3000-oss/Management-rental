@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MotorMaster, TransaksiSewa, PengeluaranMotor, FrequentRenter, GuaranteeIdType, CustomerCategory, YearlyRecapArchive } from './types/rental';
-import { ConnectedSheetInfo } from './services/googleSheetsService';
+import { ConnectedSheetInfo, getAccessToken, pushDataToGoogleSpreadsheet } from './services/googleSheetsService';
 import { 
   INITIAL_FLEET, 
   INITIAL_TRANSACTIONS, 
@@ -15,8 +15,9 @@ import {
   exportYearlyRecapToJSON,
   getCloudApiBaseUrl
 } from './utils/formatters';
-import { Navbar } from './components/Navbar';
+import { Navbar, NavTabId } from './components/Navbar';
 import { FleetGrid } from './components/FleetGrid';
+import { RentalScheduleCalendar } from './components/RentalScheduleCalendar';
 import { TransactionsTable } from './components/TransactionsTable';
 import { FrequentRentersDatabase } from './components/FrequentRentersDatabase';
 import { TarifReferenceTable } from './components/TarifReferenceTable';
@@ -40,11 +41,12 @@ import fleetHeroBanner from './assets/images/fleet_hero_banner_1792514895754.jpg
 
 export default function App() {
   // Navigation tab state
-  const [activeTab, setActiveTab] = useState<'fleet' | 'transaksi' | 'pelanggan' | 'tarif' | 'pengeluaran' | 'laporan'>('fleet');
+  const [activeTab, setActiveTab] = useState<NavTabId>('fleet');
 
-  // Core Data States with LocalStorage support
+  // Core Data States with LocalStorage support (clean v2 production-ready state)
   const [fleet, setFleet] = useState<MotorMaster[]>(() => {
-    const saved = localStorage.getItem('motorent_malang_fleet_v1');
+    localStorage.removeItem('motorent_malang_fleet_v1');
+    const saved = localStorage.getItem('motorent_malang_fleet_v2');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { /* ignore */ }
     }
@@ -52,7 +54,8 @@ export default function App() {
   });
 
   const [transactions, setTransactions] = useState<TransaksiSewa[]>(() => {
-    const saved = localStorage.getItem('motorent_malang_transactions_v1');
+    localStorage.removeItem('motorent_malang_transactions_v1');
+    const saved = localStorage.getItem('motorent_malang_transactions_v2');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { /* ignore */ }
     }
@@ -60,7 +63,8 @@ export default function App() {
   });
 
   const [expenses, setExpenses] = useState<PengeluaranMotor[]>(() => {
-    const saved = localStorage.getItem('motorent_malang_expenses_v1');
+    localStorage.removeItem('motorent_malang_expenses_v1');
+    const saved = localStorage.getItem('motorent_malang_expenses_v2');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { /* ignore */ }
     }
@@ -68,7 +72,8 @@ export default function App() {
   });
 
   const [renters, setRenters] = useState<FrequentRenter[]>(() => {
-    const saved = localStorage.getItem('motorent_malang_renters_v1');
+    localStorage.removeItem('motorent_malang_renters_v1');
+    const saved = localStorage.getItem('motorent_malang_renters_v2');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { /* ignore */ }
     }
@@ -77,7 +82,8 @@ export default function App() {
 
   // Active Operational Book Year (Tahun Buku Aktif)
   const [activeBookYear, setActiveBookYear] = useState<number>(() => {
-    const saved = localStorage.getItem('airent_active_book_year_v1');
+    localStorage.removeItem('airent_active_book_year_v1');
+    const saved = localStorage.getItem('airent_active_book_year_v2');
     if (saved && !isNaN(parseInt(saved))) {
       return parseInt(saved);
     }
@@ -86,20 +92,12 @@ export default function App() {
 
   // Archived Yearly Recaps (Arsip Rekap Tahunan Otomatis)
   const [yearlyRecaps, setYearlyRecaps] = useState<YearlyRecapArchive[]>(() => {
-    const saved = localStorage.getItem('airent_yearly_recaps_v1');
+    localStorage.removeItem('airent_yearly_recaps_v1');
+    const saved = localStorage.getItem('airent_yearly_recaps_v2');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { /* ignore */ }
     }
-    return [
-      generateYearlyRecapSnapshot(
-        2025,
-        INITIAL_FLEET,
-        INITIAL_TRANSACTIONS,
-        INITIAL_EXPENSES,
-        true,
-        'Rekapitulasi tutup buku otomatis Tahun Anggaran 2025'
-      )
-    ];
+    return [];
   });
 
   // Connected Google Spreadsheet Info
@@ -123,6 +121,30 @@ export default function App() {
   const lastServerRevisionRef = useRef<number>(0);
   const isApplyingRemoteStateRef = useRef<boolean>(false);
   const hasLoadedInitialCloudRef = useRef<boolean>(false);
+  const pendingCloudPushRef = useRef<boolean>(false);
+  const pendingSheetsPushRef = useRef<boolean>(false);
+  const isPushingSheetsRef = useRef<boolean>(false);
+  const latestStateRef = useRef({
+    fleet,
+    transactions,
+    expenses,
+    renters,
+    activeBookYear,
+    yearlyRecaps,
+    connectedSheetInfo,
+  });
+
+  useEffect(() => {
+    latestStateRef.current = {
+      fleet,
+      transactions,
+      expenses,
+      renters,
+      activeBookYear,
+      yearlyRecaps,
+      connectedSheetInfo,
+    };
+  }, [fleet, transactions, expenses, renters, activeBookYear, yearlyRecaps, connectedSheetInfo]);
 
   const applyServerState = useCallback((remote: {
     revision?: number;
@@ -135,9 +157,9 @@ export default function App() {
     activeBookYear?: number;
     yearlyRecaps?: YearlyRecapArchive[];
     connectedSheetInfo?: ConnectedSheetInfo | null;
-  }) => {
+  }, forceApply = false) => {
     if (!remote || typeof remote.revision !== 'number') return;
-    if (remote.revision <= lastServerRevisionRef.current && hasLoadedInitialCloudRef.current) {
+    if (!forceApply && remote.revision <= lastServerRevisionRef.current && hasLoadedInitialCloudRef.current) {
       setCloudStatus(prev => ({
         ...prev,
         isOnline: true,
@@ -171,124 +193,256 @@ export default function App() {
     }, 60);
   }, []);
 
-  const fetchLatestCloudState = useCallback(async () => {
+  const isInternetConnected = useCallback((): boolean => {
+    return typeof navigator === 'undefined' || navigator.onLine !== false;
+  }, []);
+
+  const pushStateToCloud = useCallback(async (sourceAction = 'auto_sync'): Promise<boolean> => {
+    if (isApplyingRemoteStateRef.current) return false;
+    if (!isInternetConnected()) {
+      pendingCloudPushRef.current = true;
+      setCloudStatus(prev => ({ ...prev, isOnline: false, isSyncing: false }));
+      return false;
+    }
     try {
       setCloudStatus(prev => ({ ...prev, isSyncing: true }));
-      const res = await fetch(`${getCloudApiBaseUrl()}/api/cloud-state`);
+      const snap = latestStateRef.current;
+      const res = await fetch(`${getCloudApiBaseUrl()}/api/cloud-state`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fleet: snap.fleet,
+          transactions: snap.transactions,
+          expenses: snap.expenses,
+          renters: snap.renters,
+          activeBookYear: snap.activeBookYear,
+          yearlyRecaps: snap.yearlyRecaps,
+          connectedSheetInfo: snap.connectedSheetInfo,
+          sourceAction,
+        }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        pendingCloudPushRef.current = false;
+        if (typeof updated.revision === 'number') {
+          lastServerRevisionRef.current = updated.revision;
+          setCloudStatus({
+            isOnline: true,
+            isSyncing: false,
+            lastUpdated: updated.updatedAt || new Date().toISOString(),
+            revision: updated.revision,
+            connectedClients: updated.connectedClients || 1,
+          });
+        }
+        return true;
+      }
+      pendingCloudPushRef.current = true;
+      return false;
+    } catch {
+      pendingCloudPushRef.current = true;
+      setCloudStatus(prev => ({ ...prev, isOnline: false, isSyncing: false }));
+      return false;
+    }
+  }, [isInternetConnected]);
+
+  const fetchLatestCloudState = useCallback(async (forceApply = false): Promise<boolean> => {
+    if (!isInternetConnected()) {
+      setCloudStatus(prev => ({ ...prev, isOnline: false, isSyncing: false }));
+      return false;
+    }
+    try {
+      if (pendingCloudPushRef.current && !forceApply) {
+        const pushed = await pushStateToCloud('periodic_retry_upload');
+        if (pushed) return true;
+      }
+      setCloudStatus(prev => ({ ...prev, isSyncing: true }));
+      const res = await fetch(`${getCloudApiBaseUrl()}/api/cloud-state`, {
+        cache: 'no-store',
+      });
       if (res.ok) {
         const data = await res.json();
-        applyServerState(data);
+        applyServerState(data, forceApply);
+        return true;
       }
+      return false;
     } catch {
       setCloudStatus(prev => ({ ...prev, isOnline: false, isSyncing: false }));
+      return false;
     } finally {
       setCloudStatus(prev => ({ ...prev, isSyncing: false }));
     }
-  }, [applyServerState]);
+  }, [applyServerState, pushStateToCloud, isInternetConnected]);
 
-  // Connect to Real-Time Cloud Stream (SSE) + periodic fallback check
-  useEffect(() => {
-    fetchLatestCloudState();
+  // Real-time & Periodic Auto-Upload to Connected Google Spreadsheet (only when connected to internet & autoSyncEnabled is active)
+  const syncToConnectedGoogleSheet = useCallback(async () => {
+    if (!isInternetConnected()) {
+      pendingSheetsPushRef.current = true;
+      return;
+    }
+    const snap = latestStateRef.current;
+    if (!snap.connectedSheetInfo?.spreadsheetId || !snap.connectedSheetInfo.autoSyncEnabled) return;
+    if (isPushingSheetsRef.current) return;
 
-    let es: EventSource | null = null;
+    const token = await getAccessToken();
+    if (!token) return;
+
+    isPushingSheetsRef.current = true;
     try {
-      es = new EventSource(`${getCloudApiBaseUrl()}/api/cloud-stream`);
-      es.onmessage = (event) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          if (parsed && parsed.state) {
-            applyServerState({
-              ...parsed.state,
-              connectedClients: parsed.connectedClients,
-            });
-          }
-        } catch {
-          // ignore malformed event
-        }
-      };
-      es.onerror = () => {
-        setCloudStatus(prev => ({ ...prev, isOnline: false }));
-      };
+      await pushDataToGoogleSpreadsheet(token, snap.connectedSheetInfo.spreadsheetId, {
+        fleet: snap.fleet,
+        transactions: snap.transactions,
+        expenses: snap.expenses,
+        renters: snap.renters,
+        yearlyRecaps: snap.yearlyRecaps,
+        activeBookYear: snap.activeBookYear,
+      });
+      pendingSheetsPushRef.current = false;
     } catch {
-      // SSE fallback handled by polling
+      pendingSheetsPushRef.current = true;
+    } finally {
+      isPushingSheetsRef.current = false;
+    }
+  }, [isInternetConnected]);
+
+  // Connect to Real-Time Cloud Stream (SSE) + periodic fallback check & periodic upload retry (only when online)
+  useEffect(() => {
+    let es: EventSource | null = null;
+
+    const connectStream = () => {
+      if (!isInternetConnected()) return;
+      if (es) es.close();
+      try {
+        es = new EventSource(`${getCloudApiBaseUrl()}/api/cloud-stream`);
+        es.onmessage = (event) => {
+          try {
+            const parsed = JSON.parse(event.data);
+            if (parsed && parsed.state) {
+              applyServerState({
+                ...parsed.state,
+                connectedClients: parsed.connectedClients,
+              });
+            }
+          } catch {
+            // ignore malformed event
+          }
+        };
+        es.onerror = () => {
+          setCloudStatus(prev => ({ ...prev, isOnline: false }));
+        };
+      } catch {
+        // SSE fallback handled by polling
+      }
+    };
+
+    if (isInternetConnected()) {
+      fetchLatestCloudState();
+      connectStream();
+    } else {
+      setCloudStatus(prev => ({ ...prev, isOnline: false, isSyncing: false }));
     }
 
-    const pollInterval = setInterval(() => {
+    const handleOnline = () => {
       fetchLatestCloudState();
+      connectStream();
+      if (pendingSheetsPushRef.current) {
+        syncToConnectedGoogleSheet();
+      }
+    };
+
+    const handleOffline = () => {
+      if (es) {
+        es.close();
+        es = null;
+      }
+      setCloudStatus(prev => ({ ...prev, isOnline: false, isSyncing: false }));
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    const pollInterval = setInterval(() => {
+      if (isInternetConnected()) {
+        fetchLatestCloudState();
+      }
     }, 5000);
 
     return () => {
       if (es) es.close();
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
       clearInterval(pollInterval);
     };
-  }, [fetchLatestCloudState, applyServerState]);
+  }, [fetchLatestCloudState, applyServerState, isInternetConnected, syncToConnectedGoogleSheet]);
 
-  // Push local changes to Cloud Server automatically
+  // Push local changes to Cloud Server automatically in real-time (only when connected to internet)
   useEffect(() => {
     if (!hasLoadedInitialCloudRef.current || isApplyingRemoteStateRef.current) {
       return;
     }
 
-    const timer = setTimeout(async () => {
-      if (isApplyingRemoteStateRef.current) return;
-      try {
-        const res = await fetch(`${getCloudApiBaseUrl()}/api/cloud-state`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fleet,
-            transactions,
-            expenses,
-            renters,
-            activeBookYear,
-            yearlyRecaps,
-            connectedSheetInfo,
-          }),
-        });
-        if (res.ok) {
-          const updated = await res.json();
-          if (typeof updated.revision === 'number') {
-            lastServerRevisionRef.current = updated.revision;
-            setCloudStatus({
-              isOnline: true,
-              isSyncing: false,
-              lastUpdated: updated.updatedAt || new Date().toISOString(),
-              revision: updated.revision,
-              connectedClients: updated.connectedClients || 1,
-            });
-          }
-        }
-      } catch {
-        setCloudStatus(prev => ({ ...prev, isOnline: false }));
+    pendingCloudPushRef.current = true;
+    if (!isInternetConnected()) {
+      setCloudStatus(prev => ({ ...prev, isOnline: false, isSyncing: false }));
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      if (isInternetConnected()) {
+        pushStateToCloud('realtime_local_save');
       }
     }, 150);
 
     return () => clearTimeout(timer);
-  }, [fleet, transactions, expenses, renters, activeBookYear, yearlyRecaps, connectedSheetInfo]);
+  }, [fleet, transactions, expenses, renters, activeBookYear, yearlyRecaps, connectedSheetInfo, pushStateToCloud, isInternetConnected]);
+
+  useEffect(() => {
+    if (!hasLoadedInitialCloudRef.current || isApplyingRemoteStateRef.current) return;
+    if (!connectedSheetInfo?.spreadsheetId || !connectedSheetInfo.autoSyncEnabled) return;
+
+    pendingSheetsPushRef.current = true;
+    if (!isInternetConnected()) return;
+
+    const timer = setTimeout(() => {
+      if (isInternetConnected()) {
+        syncToConnectedGoogleSheet();
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [fleet, transactions, expenses, renters, activeBookYear, yearlyRecaps, connectedSheetInfo, syncToConnectedGoogleSheet, isInternetConnected]);
+
+  useEffect(() => {
+    const sheetsInterval = setInterval(() => {
+      if (isInternetConnected() && pendingSheetsPushRef.current) {
+        syncToConnectedGoogleSheet();
+      }
+    }, 15000);
+    return () => clearInterval(sheetsInterval);
+  }, [syncToConnectedGoogleSheet, isInternetConnected]);
 
   // Save to localStorage on change as offline fallback
   useEffect(() => {
-    localStorage.setItem('motorent_malang_fleet_v1', JSON.stringify(fleet));
+    localStorage.setItem('motorent_malang_fleet_v2', JSON.stringify(fleet));
   }, [fleet]);
 
   useEffect(() => {
-    localStorage.setItem('motorent_malang_transactions_v1', JSON.stringify(transactions));
+    localStorage.setItem('motorent_malang_transactions_v2', JSON.stringify(transactions));
   }, [transactions]);
 
   useEffect(() => {
-    localStorage.setItem('motorent_malang_expenses_v1', JSON.stringify(expenses));
+    localStorage.setItem('motorent_malang_expenses_v2', JSON.stringify(expenses));
   }, [expenses]);
 
   useEffect(() => {
-    localStorage.setItem('motorent_malang_renters_v1', JSON.stringify(renters));
+    localStorage.setItem('motorent_malang_renters_v2', JSON.stringify(renters));
   }, [renters]);
 
   useEffect(() => {
-    localStorage.setItem('airent_active_book_year_v1', activeBookYear.toString());
+    localStorage.setItem('airent_active_book_year_v2', activeBookYear.toString());
   }, [activeBookYear]);
 
   useEffect(() => {
-    localStorage.setItem('airent_yearly_recaps_v1', JSON.stringify(yearlyRecaps));
+    localStorage.setItem('airent_yearly_recaps_v2', JSON.stringify(yearlyRecaps));
   }, [yearlyRecaps]);
 
   useEffect(() => {
@@ -383,6 +537,8 @@ export default function App() {
   const [prefilledKategori, setPrefilledKategori] = useState<string | undefined>();
   const [prefilledHarga, setPrefilledHarga] = useState<number | undefined>();
   const [prefilledLamaHari, setPrefilledLamaHari] = useState<number | undefined>();
+  const [prefilledStartDate, setPrefilledStartDate] = useState<string | undefined>();
+  const [prefilledStatusUnit, setPrefilledStatusUnit] = useState<'Disewa' | 'Booking' | undefined>();
   const [prefilledExpenseNopol, setPrefilledExpenseNopol] = useState<string | undefined>();
 
   // Flash notification message
@@ -572,6 +728,24 @@ export default function App() {
     setPrefilledKategori(customer ? customer.kategoriDefault : undefined);
     setPrefilledHarga(undefined);
     setPrefilledLamaHari(undefined);
+    setPrefilledStartDate(undefined);
+    setPrefilledStatusUnit('Disewa');
+    setIsNewRentalOpen(true);
+  };
+
+  const handleOpenNewRentalOnDate = (params: {
+    nopol?: string;
+    startDateIso?: string;
+    statusUnit?: 'Disewa' | 'Booking';
+  }) => {
+    setPrefilledCustomer(undefined);
+    setPrefilledNopol(params.nopol);
+    setPrefilledTipe(undefined);
+    setPrefilledKategori(undefined);
+    setPrefilledHarga(undefined);
+    setPrefilledLamaHari(1);
+    setPrefilledStartDate(params.startDateIso);
+    setPrefilledStatusUnit(params.statusUnit || 'Booking');
     setIsNewRentalOpen(true);
   };
 
@@ -612,11 +786,60 @@ export default function App() {
     setIsWhatsAppOpen(true);
   };
 
-  const handleDeleteTransaction = (trxId: string) => {
-    if (window.confirm(`Hapus data transaksi ${trxId}?`)) {
-      setTransactions(prev => prev.filter(t => t.id !== trxId));
-      showToast(`Transaksi ${trxId} telah dihapus.`);
+  const handleRefundTransaction = (trxId: string, nominalRefund: number, keteranganRefund: string) => {
+    const nowIso = new Date().toISOString();
+    let targetNopol = '';
+
+    const updatedTransactions = transactions.map(t => {
+      if (t.id === trxId) {
+        targetNopol = t.nopolMotor;
+        const origAmount = typeof t.pemasukanAwalSebelumRefund === 'number'
+          ? t.pemasukanAwalSebelumRefund
+          : t.totalPemasukan + (t.nominalRefund || 0);
+        const validRefund = Math.max(0, Math.min(origAmount, nominalRefund));
+        const netRemaining = Math.max(0, origAmount - validRefund);
+
+        // Clean any old [REFUND ...] tag from catatanJaminanTambahan and append the new one
+        const baseNotes = (t.catatanJaminanTambahan || '')
+          .replace(/\s*\[REFUND[^\]]*\]/gi, '')
+          .trim();
+        const refundNoteTag = `[REFUND Rp ${validRefund.toLocaleString('id-ID')}: ${keteranganRefund}]`;
+
+        return {
+          ...t,
+          pemasukanAwalSebelumRefund: origAmount,
+          nominalRefund: validRefund,
+          totalPemasukan: netRemaining,
+          statusBayar: 'Refund' as const,
+          statusUnit: 'Refund' as const,
+          keteranganRefund,
+          waktuRefund: nowIso,
+          waktuSelesai: t.waktuSelesai || nowIso,
+          catatanJaminanTambahan: baseNotes ? `${baseNotes} ${refundNoteTag}` : refundNoteTag,
+        };
+      }
+      return t;
+    });
+
+    setTransactions(updatedTransactions);
+
+    // If no other active transaction is using this bike, return the bike status to 'Tersedia'
+    if (targetNopol) {
+      const stillActiveForBike = updatedTransactions.some(
+        t =>
+          t.nopolMotor === targetNopol &&
+          (t.statusUnit === 'Disewa' || t.statusUnit === 'Booking' || t.statusUnit === 'Overdue')
+      );
+      if (!stillActiveForBike) {
+        setFleet(prev =>
+          prev.map(b => (b.nopol === targetNopol && b.status !== 'Perawatan' ? { ...b, status: 'Tersedia' } : b))
+        );
+      }
     }
+
+    showToast(
+      `💸 Refund Transaksi ${trxId} (Rp ${nominalRefund.toLocaleString('id-ID')}) tercatat: "${keteranganRefund}"`
+    );
   };
 
   // Expenses Flow
@@ -898,13 +1121,14 @@ export default function App() {
     showToast(`✅ Data transaksi & pengeluaran arsip tahun ${recap.year} berhasil dipulihkan ke tabel utama!`);
   };
 
-  // Reset to initial seed data
+  // Reset to clean production-ready state (13 units Tersedia, empty transactions/expenses/renters)
   const handleResetData = async () => {
-    if (window.confirm('Reset seluruh data ke data bawaan awal (13 unit motor, transaksi, pengeluaran & penyewa setia)?')) {
+    if (window.confirm('Reset seluruh data transaksi, pelanggan, dan pengeluaran agar kembali bersih siap pakai (13 unit motor status Tersedia)?')) {
       setFleet(INITIAL_FLEET);
       setTransactions(INITIAL_TRANSACTIONS);
       setExpenses(INITIAL_EXPENSES);
       setRenters(INITIAL_FREQUENT_RENTERS);
+      setYearlyRecaps([]);
       setActiveBookYear(2026);
       localStorage.removeItem('motorent_malang_fleet_v1');
       localStorage.removeItem('motorent_malang_transactions_v1');
@@ -912,6 +1136,12 @@ export default function App() {
       localStorage.removeItem('motorent_malang_renters_v1');
       localStorage.removeItem('airent_active_book_year_v1');
       localStorage.removeItem('airent_yearly_recaps_v1');
+      localStorage.removeItem('motorent_malang_fleet_v2');
+      localStorage.removeItem('motorent_malang_transactions_v2');
+      localStorage.removeItem('motorent_malang_expenses_v2');
+      localStorage.removeItem('motorent_malang_renters_v2');
+      localStorage.removeItem('airent_active_book_year_v2');
+      localStorage.removeItem('airent_yearly_recaps_v2');
       try {
         const res = await fetch(`${getCloudApiBaseUrl()}/api/cloud-reset`, { method: 'POST' });
         if (res.ok) {
@@ -921,7 +1151,7 @@ export default function App() {
       } catch {
         // ignore
       }
-      showToast('🔄 Data berhasil direset ke database awal.');
+      showToast('🔄 Aplikasi telah direset bersih dan siap pakai (13 unit Tersedia).');
     }
   };
 
@@ -938,6 +1168,144 @@ export default function App() {
       setRenters(backup.renters);
     }
     showToast('✅ Berhasil memulihkan data dari cadangan!');
+  };
+
+  // Manual Save Shortcut (Lokal + Cloud Server + Google Sheets if connected)
+  const handleManualSave = async () => {
+    setCloudStatus(prev => ({ ...prev, isSyncing: true }));
+    const timeLabel = new Date().toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+
+    // 1. Save immediately to LocalStorage
+    try {
+      localStorage.setItem('motorent_malang_fleet_v2', JSON.stringify(fleet));
+      localStorage.setItem('motorent_malang_transactions_v2', JSON.stringify(transactions));
+      localStorage.setItem('motorent_malang_expenses_v2', JSON.stringify(expenses));
+      localStorage.setItem('motorent_malang_renters_v2', JSON.stringify(renters));
+      localStorage.setItem('airent_active_book_year_v2', activeBookYear.toString());
+      localStorage.setItem('airent_yearly_recaps_v2', JSON.stringify(yearlyRecaps));
+      if (connectedSheetInfo) {
+        localStorage.setItem('airent_connected_sheet_v1', JSON.stringify(connectedSheetInfo));
+      }
+    } catch {
+      // ignore storage quota errors
+    }
+
+    let cloudSaved = false;
+    let sheetSaved = false;
+
+    // 2. Push immediately to Cloud Server
+    try {
+      const res = await fetch(`${getCloudApiBaseUrl()}/api/cloud-state`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fleet,
+          transactions,
+          expenses,
+          renters,
+          activeBookYear,
+          yearlyRecaps,
+          connectedSheetInfo,
+        }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        cloudSaved = true;
+        if (typeof updated.revision === 'number') {
+          lastServerRevisionRef.current = updated.revision;
+          setCloudStatus({
+            isOnline: true,
+            isSyncing: false,
+            lastUpdated: updated.updatedAt || new Date().toISOString(),
+            revision: updated.revision,
+            connectedClients: updated.connectedClients || 1,
+          });
+        }
+      }
+    } catch {
+      setCloudStatus(prev => ({ ...prev, isOnline: false }));
+    }
+
+    // 3. Also push to Google Sheets if connected and session token is active
+    if (connectedSheetInfo?.spreadsheetId) {
+      try {
+        const { getAccessToken, pushDataToGoogleSpreadsheet } = await import('./services/googleSheetsService');
+        const token = await getAccessToken();
+        if (token) {
+          await pushDataToGoogleSpreadsheet(token, connectedSheetInfo.spreadsheetId, {
+            fleet,
+            transactions,
+            expenses,
+            renters,
+            yearlyRecaps,
+            activeBookYear,
+          });
+          sheetSaved = true;
+          const nowIso = new Date().toISOString();
+          setConnectedSheetInfo(prev => (prev ? { ...prev, lastSyncedAt: nowIso } : prev));
+        }
+      } catch {
+        // non-blocking if Google token expired
+      }
+    }
+
+    setCloudStatus(prev => ({ ...prev, isSyncing: false }));
+
+    if (cloudSaved && sheetSaved) {
+      showToast(`💾 Data berhasil disimpan manual ke Lokal, Cloud & Google Sheets (${timeLabel})`);
+    } else if (cloudSaved) {
+      showToast(`💾 Data berhasil disimpan manual ke Lokal & Cloud Server (${timeLabel})`);
+    } else {
+      showToast(`💾 Data berhasil disimpan ke perangkat lokal (${timeLabel})`);
+    }
+  };
+
+  // Manual Update / Refresh Shortcut (Pull latest from Cloud Server & Google Sheets if active)
+  const handleManualUpdate = async () => {
+    setCloudStatus(prev => ({ ...prev, isSyncing: true }));
+    const timeLabel = new Date().toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+
+    const cloudUpdated = await fetchLatestCloudState(true);
+
+    if (cloudUpdated) {
+      showToast(`🔄 Data berhasil diperbarui dari Cloud Server (${timeLabel} · Rev #${lastServerRevisionRef.current})`);
+    } else {
+      showToast(`⚠️ Mode lokal aktif — menggunakan data terakhir di perangkat (${timeLabel})`);
+    }
+  };
+
+  // Quick 1-click JSON Backup Download Shortcut
+  const handleQuickBackupDownload = () => {
+    const backupPayload = {
+      exportedAt: new Date().toISOString(),
+      activeBookYear,
+      fleet,
+      transactions,
+      expenses,
+      renters,
+      yearlyRecaps,
+    };
+    const blob = new Blob([JSON.stringify(backupPayload, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dateStr = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `airent-backup-${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('📥 File cadangan (.json) berhasil diunduh ke perangkat Anda.');
   };
 
   // If app is opened as the Authorized Cloud OAuth Bridge for GitHub Pages (?auth_bridge=<sessionId>)
@@ -1085,10 +1453,17 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         fleetCount={fleet.length}
+        activeBookingsCount={transactions.filter(t => t.statusUnit === 'Booking').length}
         activeBookYear={activeBookYear}
         isCloudOnline={cloudStatus.isOnline}
+        isCloudSyncing={cloudStatus.isSyncing}
+        lastCloudUpdated={cloudStatus.lastUpdated}
+        cloudRevision={cloudStatus.revision}
         hasConnectedSheet={Boolean(connectedSheetInfo)}
         onOpenNewRental={() => handleOpenNewRental()}
+        onManualSave={handleManualSave}
+        onManualUpdate={handleManualUpdate}
+        onQuickBackupDownload={handleQuickBackupDownload}
         onOpenAppsScript={() => {
           setAppsScriptInitialTab('sheets_live');
           setIsAppsScriptOpen(true);
@@ -1106,7 +1481,7 @@ export default function App() {
       />
 
       {/* Main Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
         
         {activeTab === 'fleet' && (
           <FleetGrid
@@ -1126,6 +1501,19 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'kalender' && (
+          <RentalScheduleCalendar
+            fleet={fleet}
+            transactions={transactions}
+            frequentRenters={renters}
+            activeBookYear={activeBookYear}
+            onCheckInRow={handleCheckInByTrxId}
+            onCheckOutRow={handleCheckOutByTrxId}
+            onOpenWhatsApp={handleOpenWhatsApp}
+            onOpenNewRentalOnDate={handleOpenNewRentalOnDate}
+          />
+        )}
+
         {activeTab === 'transaksi' && (
           <TransactionsTable
             transactions={transactions}
@@ -1135,7 +1523,7 @@ export default function App() {
             onCheckInRow={handleCheckInByTrxId}
             onCheckOutRow={handleCheckOutByTrxId}
             onOpenWhatsApp={handleOpenWhatsApp}
-            onDeleteTransaction={handleDeleteTransaction}
+            onRefundTransaction={handleRefundTransaction}
             onOpenNewRental={() => handleOpenNewRental()}
             onSaveCustomerToDatabase={handleSaveCustomerFromTrx}
             onOpenYearRollover={() => handleOpenYearRollover('rollover')}
@@ -1184,7 +1572,7 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950/80 py-6 text-center text-xs text-slate-500">
+      <footer className="border-t border-slate-900 bg-slate-950/80 pt-5 pb-24 lg:pb-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div>
             © {activeBookYear} Ai Rent · Sistem Manajemen Rental Motor ({fleet.length} Fleet Unit · Tahun Buku {activeBookYear})
@@ -1192,21 +1580,21 @@ export default function App() {
           <div className="flex items-center gap-4 text-slate-400">
             <button
               onClick={() => handleOpenYearRollover('rollover')}
-              className="hover:text-emerald-400 transition-colors font-medium"
+              className="hover:text-emerald-400 transition-colors font-medium cursor-pointer"
             >
               Pergantian Tahun &amp; Rekap Otomatis
             </button>
             <span>·</span>
             <button
               onClick={() => setIsAppsScriptOpen(true)}
-              className="hover:text-cyan-400 transition-colors"
+              className="hover:text-cyan-400 transition-colors cursor-pointer"
             >
               Google Apps Script Source
             </button>
             <span>·</span>
             <button
               onClick={handleResetData}
-              className="hover:text-cyan-400 transition-colors"
+              className="hover:text-cyan-400 transition-colors cursor-pointer"
             >
               Reset Data
             </button>
@@ -1216,7 +1604,7 @@ export default function App() {
 
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 border border-cyan-500/80 text-white text-xs px-4 py-3 rounded-xl shadow-2xl backdrop-blur-md flex items-center gap-2 animate-bounce">
+        <div className="fixed bottom-20 lg:bottom-6 right-4 sm:right-6 z-50 bg-slate-900 border border-cyan-500/80 text-white text-xs px-4 py-3 rounded-xl shadow-2xl backdrop-blur-md flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
           <span>{toastMessage}</span>
         </div>
@@ -1236,6 +1624,8 @@ export default function App() {
         prefilledKategori={prefilledKategori}
         prefilledHarga={prefilledHarga}
         prefilledLamaHari={prefilledLamaHari}
+        prefilledStartDate={prefilledStartDate}
+        prefilledStatusUnit={prefilledStatusUnit}
       />
 
       <NewExpenseModal
@@ -1269,7 +1659,9 @@ export default function App() {
           setConnectedSheetInfo(info);
         }}
         cloudStatus={cloudStatus}
-        onForceCloudSync={fetchLatestCloudState}
+        onForceCloudSync={async () => {
+          await fetchLatestCloudState(true);
+        }}
         onRestoreData={handleRestoreData}
       />
 

@@ -8,7 +8,6 @@ import {
   INITIAL_EXPENSES,
   INITIAL_FREQUENT_RENTERS,
 } from './src/data/initialFleetData.ts';
-import { generateYearlyRecapSnapshot } from './src/utils/formatters.ts';
 import type {
   MotorMaster,
   TransaksiSewa,
@@ -45,16 +44,7 @@ function getInitialDatabaseState(): CloudDatabaseState {
     expenses: INITIAL_EXPENSES,
     renters: INITIAL_FREQUENT_RENTERS,
     activeBookYear: 2026,
-    yearlyRecaps: [
-      generateYearlyRecapSnapshot(
-        2025,
-        INITIAL_FLEET,
-        INITIAL_TRANSACTIONS,
-        INITIAL_EXPENSES,
-        true,
-        'Rekapitulasi tutup buku otomatis Tahun Anggaran 2025'
-      ),
-    ],
+    yearlyRecaps: [],
     connectedSheetInfo: null,
   };
 }
@@ -129,11 +119,14 @@ async function startServer() {
 
   app.use(express.json({ limit: '10mb' }));
 
-  // Allow cross-origin requests from GitHub Pages (*.github.io) and custom domains
+  // Allow cross-origin requests from GitHub Pages (*.github.io) and custom domains + Security Headers
   app.use('/api', (req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Cache-Control', 'no-store');
     if (req.method === 'OPTIONS') {
       res.status(204).end();
       return;
@@ -182,7 +175,21 @@ async function startServer() {
 
   // 3. Update Authoritative Cloud State (Admin / Sync actions)
   app.post('/api/cloud-state', (req, res) => {
-    const body = req.body || {};
+    const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      res.status(400).json({ error: 'Payload state tidak valid.' });
+      return;
+    }
+
+    if (
+      (body.fleet !== undefined && !Array.isArray(body.fleet)) ||
+      (body.transactions !== undefined && !Array.isArray(body.transactions)) ||
+      (body.expenses !== undefined && !Array.isArray(body.expenses)) ||
+      (body.renters !== undefined && !Array.isArray(body.renters))
+    ) {
+      res.status(400).json({ error: 'Format koleksi data tidak valid.' });
+      return;
+    }
 
     let changed = false;
     if (Array.isArray(body.fleet)) {
@@ -218,7 +225,9 @@ async function startServer() {
       dbState.revision += 1;
       dbState.updatedAt = new Date().toISOString();
       saveDatabase(dbState);
-      broadcastStateUpdate(body.sourceAction || 'admin_update');
+      broadcastStateUpdate(
+        typeof body.sourceAction === 'string' ? body.sourceAction.slice(0, 64) : 'admin_update'
+      );
     }
 
     res.json({
@@ -230,7 +239,15 @@ async function startServer() {
   // 4. Atomic Endpoint for Public Customer Self-Service QR Booking
   app.post('/api/cloud-booking', (req, res) => {
     const newTrx: TransaksiSewa | undefined = req.body?.transaction;
-    if (!newTrx || !newTrx.id || !newTrx.nopolMotor) {
+    if (
+      !newTrx ||
+      typeof newTrx.id !== 'string' ||
+      newTrx.id.trim().length === 0 ||
+      newTrx.id.length > 128 ||
+      typeof newTrx.nopolMotor !== 'string' ||
+      newTrx.nopolMotor.trim().length === 0 ||
+      newTrx.nopolMotor.length > 32
+    ) {
       res.status(400).json({ error: 'Data pesanan tidak valid.' });
       return;
     }
@@ -276,6 +293,10 @@ async function startServer() {
   });
 
   // 6. Ephemeral OAuth Bridge Relay for GitHub Pages (solves auth/unauthorized-domain)
+  const AUTH_BRIDGE_TTL_MS = 180_000;
+  const MAX_BRIDGE_SESSIONS = 500;
+  const VALID_SESSION_ID_REGEX = /^[a-zA-Z0-9_-]{8,128}$/;
+
   const authBridgeSessions = new Map<
     string,
     {
@@ -294,20 +315,37 @@ async function startServer() {
   app.post('/api/auth-bridge/:sessionId', (req, res) => {
     const { sessionId } = req.params;
     const { accessToken, idToken, user } = req.body || {};
-    if (!sessionId || !accessToken || !user) {
+    if (
+      !sessionId ||
+      !VALID_SESSION_ID_REGEX.test(sessionId) ||
+      typeof accessToken !== 'string' ||
+      !accessToken.trim() ||
+      !user ||
+      typeof user !== 'object' ||
+      typeof user.uid !== 'string'
+    ) {
       res.status(400).json({ error: 'Invalid auth bridge payload' });
       return;
     }
     const now = Date.now();
     for (const [k, v] of authBridgeSessions.entries()) {
-      if (now - v.createdAt > 180_000) {
+      if (now - v.createdAt > AUTH_BRIDGE_TTL_MS) {
         authBridgeSessions.delete(k);
       }
     }
+    if (authBridgeSessions.size >= MAX_BRIDGE_SESSIONS) {
+      const oldestKey = authBridgeSessions.keys().next().value;
+      if (oldestKey) authBridgeSessions.delete(oldestKey);
+    }
     authBridgeSessions.set(sessionId, {
       accessToken,
-      idToken: idToken || null,
-      user,
+      idToken: typeof idToken === 'string' ? idToken : null,
+      user: {
+        uid: String(user.uid).slice(0, 128),
+        email: user.email ? String(user.email).slice(0, 256) : null,
+        displayName: user.displayName ? String(user.displayName).slice(0, 256) : null,
+        photoURL: user.photoURL ? String(user.photoURL).slice(0, 1024) : null,
+      },
       createdAt: now,
     });
     res.json({ ok: true });
@@ -315,12 +353,20 @@ async function startServer() {
 
   app.get('/api/auth-bridge/:sessionId', (req, res) => {
     const { sessionId } = req.params;
+    if (!sessionId || !VALID_SESSION_ID_REGEX.test(sessionId)) {
+      res.status(400).json({ error: 'Invalid session ID format' });
+      return;
+    }
     const entry = authBridgeSessions.get(sessionId);
     if (!entry) {
       res.json({ ready: false });
       return;
     }
     authBridgeSessions.delete(sessionId);
+    if (Date.now() - entry.createdAt > AUTH_BRIDGE_TTL_MS) {
+      res.json({ ready: false });
+      return;
+    }
     res.json({
       ready: true,
       accessToken: entry.accessToken,
@@ -332,6 +378,14 @@ async function startServer() {
   // Vite middleware for development or static serving for production
   if (process.env.NODE_ENV !== 'production') {
     process.env.DISABLE_HMR = 'true';
+    const viteClientDir = path.join(__dirname, 'node_modules/vite/dist/client');
+    const viteClientPath = path.join(viteClientDir, 'client.mjs');
+    const viteBundledPath = path.join(viteClientDir, 'bundledDevClient.mjs');
+    if (!fs.existsSync(viteClientPath) && fs.existsSync(viteBundledPath)) {
+      const lines = fs.readFileSync(viteBundledPath, 'utf-8').split('\n');
+      const restored = [lines[1], ...lines.slice(2, 237), ...lines.slice(496, 1586), lines[1623], ''].join('\n');
+      fs.writeFileSync(viteClientPath, restored, 'utf-8');
+    }
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {

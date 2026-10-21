@@ -10,15 +10,15 @@ import {
   Search, 
   Download, 
   Phone, 
-  CheckCircle2, 
-  Clock, 
   AlertCircle, 
-  Trash2, 
+  RotateCcw, 
   ArrowUpDown,
   FileText,
   UserCheck,
   Star,
-  CalendarCheck
+  CalendarCheck,
+  X,
+  CheckCircle2
 } from 'lucide-react';
 
 interface TransactionsTableProps {
@@ -29,11 +29,19 @@ interface TransactionsTableProps {
   onCheckInRow: (trxId: string) => void;
   onCheckOutRow: (trxId: string) => void;
   onOpenWhatsApp: (trx: TransaksiSewa) => void;
-  onDeleteTransaction: (trxId: string) => void;
+  onRefundTransaction: (trxId: string, nominalRefund: number, keteranganRefund: string) => void;
   onOpenNewRental: () => void;
   onSaveCustomerToDatabase?: (trx: TransaksiSewa) => void;
   onOpenYearRollover?: () => void;
 }
+
+const REFUND_REASON_PRESETS = [
+  'Pembatalan booking oleh penyewa',
+  'Perubahan jadwal / tanggal sewa',
+  'Pengembalian unit lebih awal (potong hari)',
+  'Ganti unit motor / kendala teknis armada',
+  'Pengembalian kelebihan bayar / uang DP'
+];
 
 export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   transactions,
@@ -43,7 +51,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   onCheckInRow,
   onCheckOutRow,
   onOpenWhatsApp,
-  onDeleteTransaction,
+  onRefundTransaction,
   onOpenNewRental,
   onSaveCustomerToDatabase,
   onOpenYearRollover
@@ -58,6 +66,13 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   const [sortField, setSortField] = useState<'waktuStartSewa' | 'totalPemasukan' | 'namaPenyewa'>('waktuStartSewa');
   const [sortAsc, setSortAsc] = useState(false);
 
+  // Refund Modal State
+  const [refundTargetTrx, setRefundTargetTrx] = useState<TransaksiSewa | null>(null);
+  const [refundType, setRefundType] = useState<'full' | 'partial'>('full');
+  const [refundNominal, setRefundNominal] = useState<number>(0);
+  const [refundDescription, setRefundDescription] = useState<string>('');
+  const [refundError, setRefundError] = useState<string>('');
+
   const availableYears = Array.from(
     new Set<number>([
       activeBookYear,
@@ -70,6 +85,50 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
   // Bike map for quick model lookups
   const bikeMap = new Map<string, MotorMaster>();
   fleet.forEach(b => bikeMap.set(b.nopol, b));
+
+  const getOriginalAmount = (trx: TransaksiSewa): number => {
+    if (typeof trx.pemasukanAwalSebelumRefund === 'number') {
+      return trx.pemasukanAwalSebelumRefund;
+    }
+    return trx.totalPemasukan + (trx.nominalRefund || 0);
+  };
+
+  const handleOpenRefundModal = (trx: TransaksiSewa) => {
+    const origAmount = getOriginalAmount(trx);
+    setRefundTargetTrx(trx);
+    if (trx.statusUnit === 'Refund' && typeof trx.nominalRefund === 'number') {
+      setRefundNominal(trx.nominalRefund);
+      setRefundType(trx.nominalRefund >= origAmount ? 'full' : 'partial');
+      setRefundDescription(trx.keteranganRefund || '');
+    } else {
+      setRefundNominal(origAmount);
+      setRefundType('full');
+      setRefundDescription(trx.keteranganRefund || '');
+    }
+    setRefundError('');
+  };
+
+  const handleCloseRefundModal = () => {
+    setRefundTargetTrx(null);
+    setRefundError('');
+  };
+
+  const handleSubmitRefund = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!refundTargetTrx) return;
+
+    const cleanDesc = refundDescription.trim();
+    if (!cleanDesc) {
+      setRefundError('Harap isi keterangan / alasan refund terlebih dahulu.');
+      return;
+    }
+
+    const origAmount = getOriginalAmount(refundTargetTrx);
+    const validNominal = Math.max(0, Math.min(origAmount, Number(refundNominal) || 0));
+
+    onRefundTransaction(refundTargetTrx.id, validNominal, cleanDesc);
+    handleCloseRefundModal();
+  };
 
   const resolveHelm = (trx: TransaksiSewa): string => {
     if (trx.jumlahHelm) return trx.jumlahHelm;
@@ -111,7 +170,8 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
       const matchNopol = trx.nopolMotor.toLowerCase().includes(q);
       const matchAlamat = trx.alamatAsalKos.toLowerCase().includes(q);
       const matchId = trx.id.toLowerCase().includes(q);
-      if (!matchName && !matchWa && !matchNopol && !matchAlamat && !matchId) return false;
+      const matchRefundDesc = (trx.keteranganRefund || '').toLowerCase().includes(q);
+      if (!matchName && !matchWa && !matchNopol && !matchAlamat && !matchId && !matchRefundDesc) return false;
     }
     return true;
   });
@@ -209,6 +269,8 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
         return <span className="px-2 py-0.5 rounded text-xs font-semibold text-amber-400 bg-amber-950/60 border border-amber-800/60">Booking</span>;
       case 'Overdue':
         return <span className="px-2 py-0.5 rounded text-xs font-semibold text-rose-400 bg-rose-950/60 border border-rose-800/80 animate-pulse">Overdue</span>;
+      case 'Refund':
+        return <span className="px-2 py-0.5 rounded text-xs font-semibold text-purple-300 bg-purple-950/70 border border-purple-700/70">Refund</span>;
       default:
         return <span className="px-2 py-0.5 rounded text-xs font-semibold text-slate-400 bg-slate-800">{status}</span>;
     }
@@ -224,7 +286,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Cari nama penyewa, nomor WhatsApp (08... / 62...), nopol, alamat..."
+            placeholder="Cari nama penyewa, WhatsApp, nopol, alamat, atau keterangan refund..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none transition-colors"
@@ -244,6 +306,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
             <option value="Booking">Booking</option>
             <option value="Overdue">Overdue</option>
             <option value="Selesai">Selesai</option>
+            <option value="Refund">Refund</option>
           </select>
 
           {/* Nopol Motor Filter */}
@@ -252,7 +315,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
             onChange={e => setFilterNopol(e.target.value)}
             className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500"
           >
-            <option value="all">Semua Motor (13 Unit)</option>
+            <option value="all">Semua Motor ({fleet.length} Unit)</option>
             {fleet.map(b => (
               <option key={b.nopol} value={b.nopol}>
                 {b.namaUnit} - {b.nopol} ({b.tipeMotor})
@@ -355,7 +418,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                   className="py-3 px-3 cursor-pointer hover:text-slate-200"
                 >
                   <div className="flex items-center gap-1">
-                    <span>Penyewa & Kontak</span>
+                    <span>Penyewa &amp; Kontak</span>
                     <ArrowUpDown className="w-3 h-3" />
                   </div>
                 </th>
@@ -368,7 +431,7 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                   className="py-3 px-3 cursor-pointer hover:text-slate-200"
                 >
                   <div className="flex items-center gap-1">
-                    <span>Mulai & Durasi</span>
+                    <span>Mulai &amp; Durasi</span>
                     <ArrowUpDown className="w-3 h-3" />
                   </div>
                 </th>
@@ -398,11 +461,15 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                 sorted.map((trx) => {
                   const bike = bikeMap.get(trx.nopolMotor);
                   const overdue = checkIsOverdue(trx);
+                  const isRefunded = trx.statusUnit === 'Refund' || trx.statusBayar === 'Refund' || Boolean(trx.nominalRefund && trx.nominalRefund > 0);
+                  const origAmount = getOriginalAmount(trx);
 
                   return (
                     <tr 
                       key={trx.id}
-                      className="hover:bg-slate-800/40 transition-colors"
+                      className={`transition-colors ${
+                        isRefunded ? 'bg-purple-950/10 hover:bg-purple-950/20' : 'hover:bg-slate-800/40'
+                      }`}
                     >
                       {/* ID & Hari Sewa (Auto-Day) */}
                       <td className="py-3 px-3 align-top whitespace-nowrap">
@@ -412,8 +479,8 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                         </div>
                       </td>
 
-                      {/* Penyewa & Kontak & Alamat */}
-                      <td className="py-3 px-3 align-top max-w-[220px]">
+                      {/* Penyewa & Kontak & Alamat + Keterangan Refund */}
+                      <td className="py-3 px-3 align-top max-w-[250px]">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-semibold text-white truncate">{trx.namaPenyewa}</span>
                           {(() => {
@@ -453,6 +520,22 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                           <UserCheck className="w-2.5 h-2.5 text-emerald-400" />
                           <span>Jaminan: {trx.identitasDijaminkan}</span>
                         </div>
+
+                        {/* Keterangan Refund Box */}
+                        {isRefunded && trx.keteranganRefund && (
+                          <div className="mt-1.5 p-1.5 rounded-lg bg-purple-950/60 border border-purple-700/60 text-[10px] text-purple-200 leading-snug">
+                            <div className="font-bold text-purple-300 flex items-center gap-1">
+                              <RotateCcw className="w-2.5 h-2.5 shrink-0" />
+                              <span>Ket. Refund:</span>
+                            </div>
+                            <div className="mt-0.5 break-words">{trx.keteranganRefund}</div>
+                            {trx.waktuRefund && (
+                              <div className="text-[9px] text-purple-400/80 font-mono mt-0.5">
+                                {formatIndonesianDateTime(trx.waktuRefund)}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </td>
 
                       {/* Unit Motor */}
@@ -498,6 +581,17 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                             <span className="text-[10px] bg-emerald-950/70 text-emerald-300 border border-emerald-800/80 px-1.5 py-0.2 rounded font-semibold">
                               ⏱️ {trx.durasiJam || 1} Jam (Per Jam)
                             </span>
+                          ) : trx.paketKhusus === 'Paket 12 Jam' ? (
+                            <>
+                              {trx.lamaSewaHari > 0 && (
+                                <span className="text-[11px] text-cyan-400 font-medium">
+                                  {trx.lamaSewaHari} Hari +
+                                </span>
+                              )}
+                              <span className="text-[10px] bg-amber-950/70 text-amber-300 border border-amber-800/80 px-1.5 py-0.2 rounded font-semibold">
+                                🌗 Paket 12 Jam{typeof trx.hargaPaket12Jam === 'number' && trx.hargaPaket12Jam > 0 ? ` (${formatRupiah(trx.hargaPaket12Jam)})` : ''}
+                              </span>
+                            </>
                           ) : (
                             <span className="text-[11px] text-cyan-400 font-medium">
                               {trx.lamaSewaHari} Hari
@@ -529,15 +623,36 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                             Kembali: {formatIndonesianDateTime(trx.waktuSelesai)}
                           </div>
                         )}
+                        {trx.statusUnit === 'Refund' && (
+                          <div className="text-[10px] text-purple-300 font-medium mt-0.5">
+                            Dibatalkan / Refund
+                          </div>
+                        )}
                       </td>
 
                       {/* Total Pemasukan, Metode Pembayaran & Status Bayar */}
                       <td className="py-3 px-3 align-top text-right whitespace-nowrap">
-                        <div className="font-bold font-mono text-white tabular-nums">
+                        {isRefunded && origAmount !== trx.totalPemasukan && (
+                          <div className="text-[10px] font-mono text-slate-500 line-through tabular-nums">
+                            {formatRupiah(origAmount)}
+                          </div>
+                        )}
+                        <div className={`font-bold font-mono tabular-nums ${
+                          isRefunded ? 'text-purple-300' : 'text-white'
+                        }`}>
                           {formatRupiah(trx.totalPemasukan)}
                         </div>
+                        {isRefunded && typeof trx.nominalRefund === 'number' && (
+                          <div className="text-[10px] font-mono text-rose-400 font-semibold tabular-nums mt-0.5">
+                            Refund: -{formatRupiah(trx.nominalRefund)}
+                          </div>
+                        )}
                         <div className={`text-[10px] font-medium font-mono mt-0.5 ${
-                          trx.statusBayar === 'Lunas' ? 'text-emerald-400' : 'text-amber-400'
+                          trx.statusBayar === 'Lunas'
+                            ? 'text-emerald-400'
+                            : trx.statusBayar === 'Refund'
+                            ? 'text-purple-300 font-bold'
+                            : 'text-amber-400'
                         }`}>
                           {trx.statusBayar}
                         </div>
@@ -563,27 +678,27 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                         {getStatusBadge(trx.statusUnit)}
                       </td>
 
-                      {/* Aksi Cepat: Check In, Check Out, WhatsApp, Delete */}
+                      {/* Aksi Cepat: Check In, Check Out, WhatsApp, Refund */}
                       <td className="py-3 px-3 align-top text-center whitespace-nowrap">
                         <div className="flex items-center justify-center gap-1">
                           
-                          {/* If booking, show Check-In button (matching checkInActiveRow) */}
+                          {/* If booking, show Check-In button */}
                           {trx.statusUnit === 'Booking' && (
                             <button
                               onClick={() => onCheckInRow(trx.id)}
                               title="📲 Check-In Unit Sekarang (Mulai Sewa)"
-                              className="px-2 py-1 text-[11px] font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded transition-colors"
+                              className="px-2 py-1 text-[11px] font-semibold text-white bg-amber-600 hover:bg-amber-500 rounded transition-colors cursor-pointer"
                             >
                               Check-In
                             </button>
                           )}
 
-                          {/* If disewa or overdue, show Check-Out button (matching checkOutActiveRow) */}
+                          {/* If disewa or overdue, show Check-Out button */}
                           {(trx.statusUnit === 'Disewa' || trx.statusUnit === 'Overdue') && (
                             <button
                               onClick={() => onCheckOutRow(trx.id)}
                               title="🏁 Check-Out Unit (Selesai)"
-                              className="px-2 py-1 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded transition-colors"
+                              className="px-2 py-1 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded transition-colors cursor-pointer"
                             >
                               Check-Out
                             </button>
@@ -593,18 +708,27 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
                           <button
                             onClick={() => onOpenWhatsApp(trx)}
                             title="Kirim Nota / Chat WhatsApp ke Penyewa"
-                            className="p-1 text-emerald-400 hover:text-white hover:bg-emerald-900/60 rounded border border-emerald-800/40 transition-colors"
+                            className="p-1.5 text-emerald-400 hover:text-white hover:bg-emerald-900/60 rounded border border-emerald-800/40 transition-colors cursor-pointer"
                           >
                             <Phone className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* Delete transaction */}
+                          {/* Refund Transaction with Description (Replaces Delete) */}
                           <button
-                            onClick={() => onDeleteTransaction(trx.id)}
-                            title="Hapus baris transaksi"
-                            className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded transition-colors"
+                            onClick={() => handleOpenRefundModal(trx)}
+                            title={
+                              isRefunded
+                                ? 'Lihat / Ubah Keterangan Refund Transaksi'
+                                : 'Proses Refund & Beri Keterangan Alasan Refund'
+                            }
+                            className={`px-2 py-1 text-[11px] font-semibold rounded border flex items-center gap-1 transition-colors cursor-pointer ${
+                              isRefunded
+                                ? 'text-purple-200 bg-purple-950/70 hover:bg-purple-900/80 border-purple-700/70'
+                                : 'text-amber-300 bg-slate-950 hover:bg-purple-950/60 hover:text-purple-200 border-slate-700 hover:border-purple-700/70'
+                            }`}
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <RotateCcw className="w-3 h-3 shrink-0" />
+                            <span>{isRefunded ? 'Edit Refund' : 'Refund'}</span>
                           </button>
                         </div>
                       </td>
@@ -617,6 +741,236 @@ export const TransactionsTable: React.FC<TransactionsTableProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Refund Transaction Modal with Description */}
+      {refundTargetTrx && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto"
+          onClick={handleCloseRefundModal}
+        >
+          <div
+            className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-5 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/40 flex items-center justify-center text-purple-300">
+                  <RotateCcw className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-white">
+                    Refund Transaksi &amp; Keterangan
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    ID <span className="font-mono text-cyan-400 font-semibold">{refundTargetTrx.id}</span> · Unit otomatis dikembalikan ke status Tersedia
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleCloseRefundModal}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitRefund} className="p-5 space-y-4 text-xs">
+              {/* Transaction Info Summary */}
+              {(() => {
+                const origAmount = getOriginalAmount(refundTargetTrx);
+                const bike = bikeMap.get(refundTargetTrx.nopolMotor);
+                const remainingNet = Math.max(0, origAmount - (Number(refundNominal) || 0));
+
+                return (
+                  <>
+                    <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-3.5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Penyewa:</span>
+                        <span className="font-bold text-white">{refundTargetTrx.namaPenyewa} (+{refundTargetTrx.whatsapp})</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Unit Armada:</span>
+                        <span className="font-semibold text-cyan-300">
+                          {bike ? `${bike.namaUnit} (${bike.nopol})` : refundTargetTrx.nopolMotor}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Pemasukan Awal:</span>
+                        <span className="font-mono font-bold text-white">{formatRupiah(origAmount)}</span>
+                      </div>
+                    </div>
+
+                    {/* Jenis Refund Toggle */}
+                    <div className="space-y-1.5">
+                      <label className="block font-bold text-slate-200">
+                        Pilih Jenis Pengembalian Dana (Refund)
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRefundType('full');
+                            setRefundNominal(origAmount);
+                          }}
+                          className={`py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            refundType === 'full'
+                              ? 'bg-purple-600/25 border-purple-500 text-purple-200 shadow-sm'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Refund Penuh (100%)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRefundType('partial');
+                            if (refundNominal === origAmount) {
+                              setRefundNominal(Math.round(origAmount / 2));
+                            }
+                          }}
+                          className={`py-2.5 px-3 rounded-xl border font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            refundType === 'partial'
+                              ? 'bg-purple-600/25 border-purple-500 text-purple-200 shadow-sm'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Refund Sebagian / Custom</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Nominal Refund Input */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="font-bold text-slate-200">
+                          Nominal Uang Dikembalikan (Rp)
+                        </label>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRefundType('full');
+                              setRefundNominal(origAmount);
+                            }}
+                            className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-cyan-300 cursor-pointer"
+                          >
+                            100%
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRefundType('partial');
+                              setRefundNominal(Math.round(origAmount * 0.5));
+                            }}
+                            className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-cyan-300 cursor-pointer"
+                          >
+                            50%
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRefundType('partial');
+                              setRefundNominal(0);
+                            }}
+                            className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-slate-300 cursor-pointer"
+                          >
+                            Rp 0 (Batal Belum Bayar)
+                          </button>
+                        </div>
+                      </div>
+                      <input
+                        type="number"
+                        min={0}
+                        max={origAmount}
+                        step={1000}
+                        value={refundNominal}
+                        onChange={(e) => {
+                          const val = Math.max(0, Math.min(origAmount, Number(e.target.value) || 0));
+                          setRefundNominal(val);
+                          setRefundType(val >= origAmount ? 'full' : 'partial');
+                        }}
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-white outline-none"
+                      />
+                      <div className="flex items-center justify-between px-1 text-[11px]">
+                        <span className="text-rose-400 font-mono">
+                          Dana Refund: -{formatRupiah(refundNominal)}
+                        </span>
+                        <span className="text-emerald-400 font-mono font-semibold">
+                          Sisa Pemasukan Bersih: {formatRupiah(remainingNet)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Keterangan / Alasan Refund (Wajib) */}
+                    <div className="space-y-2">
+                      <label className="block font-bold text-slate-200">
+                        Keterangan / Alasan Refund <span className="text-rose-400">*</span>
+                      </label>
+                      {/* Preset Reason Chips */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {REFUND_REASON_PRESETS.map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => {
+                              setRefundDescription(preset);
+                              setRefundError('');
+                            }}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] border transition-colors cursor-pointer ${
+                              refundDescription === preset
+                                ? 'bg-purple-950 border-purple-500 text-purple-200 font-semibold'
+                                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                            }`}
+                          >
+                            {preset}
+                          </button>
+                        ))}
+                      </div>
+                      <textarea
+                        rows={3}
+                        value={refundDescription}
+                        onChange={(e) => {
+                          setRefundDescription(e.target.value);
+                          if (refundError) setRefundError('');
+                        }}
+                        placeholder="Tuliskan keterangan lengkap alasan refund (misal: Batal sewa karena jadwal kuliah berubah, dikembalikan via Transfer BRI)..."
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 rounded-xl p-3 text-xs text-white placeholder-slate-500 outline-none resize-none"
+                      />
+                      {refundError && (
+                        <div className="text-rose-400 text-[11px] font-semibold flex items-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{refundError}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Modal Footer Buttons */}
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                      <button
+                        type="button"
+                        onClick={handleCloseRefundModal}
+                        className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-lg shadow-purple-600/20 transition-colors cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Simpan Refund &amp; Keterangan</span>
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

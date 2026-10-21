@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build",
+    "build": "node -e \"const fs=require('fs'),p='node_modules/vite/dist/client/client.mjs',b='node_modules/vite/dist/client/bundledDevClient.mjs';if(!fs.existsSync(p)&&fs.existsSync(b)){const l=fs.readFileSync(b,'utf8').split('\\n');fs.writeFileSync(p,[l[1],...l.slice(2,237),...l.slice(496,1586),l[1623],''].join('\\n'));}\" && vite build",
     "start": "node server.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",

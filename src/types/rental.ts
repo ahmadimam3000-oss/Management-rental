@@ -2,9 +2,7 @@ export type BikeStatus = 'Tersedia' | 'Disewa' | 'Booking' | 'Overdue' | 'Perawa
 
 export type CustomerCategory = 
   | 'Mhs Malang' 
-  | 'Luar Malang / Wisatawan' 
-  | 'Paket Mingguan' 
-  | 'Paket Bulanan';
+  | 'Luar Malang / Wisatawan';
 
 export type GuaranteeIdType = 
   | 'KTM dan KTP'
@@ -15,7 +13,7 @@ export type GuaranteeIdType =
   | 'Lainnya'
   | (string & {});
 
-export type PaymentStatus = 'Lunas' | 'DP / Sebagian' | 'Belum Bayar';
+export type PaymentStatus = 'Lunas' | 'DP / Sebagian' | 'Belum Bayar' | 'Refund';
 
 export type PaymentMethod = 'Tunai' | 'Transfer BRI' | 'QRIS';
 
@@ -42,8 +40,6 @@ export interface TarifAcuan {
   tipeMotor: string;
   mhsMalang24Jam: number;
   luarMalang24Jam: number;
-  paketMinggu: number;
-  paketBulan: number;
 }
 
 export interface TransaksiSewa {
@@ -63,14 +59,19 @@ export interface TransaksiSewa {
   totalPemasukan: number;
   statusBayar: PaymentStatus;
   metodePembayaran?: PaymentMethod;
-  statusUnit: 'Disewa' | 'Selesai' | 'Booking' | 'Overdue';
+  statusUnit: 'Disewa' | 'Selesai' | 'Booking' | 'Overdue' | 'Refund';
   catatanJaminanTambahan: string;
   dendaKeterlambatan?: number;
   tambahanJam?: number;
-  durasiJam?: number; // Durasi untuk sewa per jam (1 - 11 jam di bawah 12 jam)
-  paketKhusus?: 'Per Jam' | 'Harian' | string;
+  durasiJam?: number; // Durasi untuk sewa per jam (1 - 11 jam di bawah 12 jam) atau 12 jam
+  paketKhusus?: 'Per Jam' | 'Paket 12 Jam' | 'Harian' | string;
+  hargaPaket12Jam?: number; // Harga opsional untuk paket sewa 12 jam
   jumlahHelm?: '0' | '1' | '2';
   levelBensin?: '1 Kotak' | '2 Kotak' | '3 Kotak' | '4 Kotak' | '5 Kotak' | 'Full Kotak';
+  nominalRefund?: number;
+  keteranganRefund?: string;
+  waktuRefund?: string;
+  pemasukanAwalSebelumRefund?: number;
 }
 
 export interface PengeluaranMotor {

@@ -70,8 +70,9 @@ export const TenantBookingMobileView: React.FC<TenantBookingMobileViewProps> = (
   // Bike & Rental details
   const [nopolMotor, setNopolMotor] = useState(fleet[0]?.nopol || '');
   const [waktuStartSewa, setWaktuStartSewa] = useState(toInputDateTimeLocal(new Date()));
-  const [lamaSewaHari, setLamaSewaHari] = useState(1);
-  const [paketKhusus, setPaketKhusus] = useState<'Harian' | 'Per Jam'>('Harian');
+  const [lamaSewaHariInput, setLamaSewaHariInput] = useState<string>('1');
+  const [paketKhusus, setPaketKhusus] = useState<'Harian' | 'Paket 12 Jam' | 'Per Jam'>('Harian');
+  const [hargaPaket12JamInput, setHargaPaket12JamInput] = useState<string>('');
   const [durasiJam, setDurasiJam] = useState<number>(1);
   const [tambahanJam, setTambahanJam] = useState<number>(0);
   const [jumlahHelm, setJumlahHelm] = useState<'0' | '1' | '2'>('2');
@@ -81,6 +82,14 @@ export const TenantBookingMobileView: React.FC<TenantBookingMobileViewProps> = (
   const [showQrisZoom, setShowQrisZoom] = useState(false);
   const [catatanKhusus, setCatatanKhusus] = useState('');
   const [agreedTerms, setAgreedTerms] = useState(false);
+
+  const lamaSewaHari = lamaSewaHariInput.trim() === ''
+    ? 0
+    : Math.max(0, parseInt(lamaSewaHariInput, 10) || 0);
+
+  const hargaPaket12Jam = hargaPaket12JamInput.trim() === ''
+    ? 0
+    : Math.max(0, parseInt(hargaPaket12JamInput, 10) || 0);
 
   // Success State
   const [submittedTrx, setSubmittedTrx] = useState<TransaksiSewa | null>(null);
@@ -94,13 +103,8 @@ export const TenantBookingMobileView: React.FC<TenantBookingMobileViewProps> = (
     const isPremium = nopol.includes('NMAX') || nopol.includes('PCX') || nopol.includes('AEROX');
     if (category === 'Mhs Malang') {
       return isPremium ? 85000 : 55000;
-    } else if (category === 'Luar Malang / Wisatawan') {
-      return isPremium ? 110000 : 70000;
-    } else if (category === 'Paket Mingguan') {
-      return isPremium ? 75000 : 50000;
-    } else {
-      return isPremium ? 65000 : 40000;
     }
+    return isPremium ? 110000 : 70000;
   };
 
   const hargaPerHari = getEstimatedDailyRate(nopolMotor, kategoriPelanggan);
@@ -117,12 +121,20 @@ export const TenantBookingMobileView: React.FC<TenantBookingMobileViewProps> = (
       0,
       durasiJam
     );
-  } else {
-    basePrice = hargaPerHari * Math.max(1, Number(lamaSewaHari));
+  } else if (paketKhusus === 'Paket 12 Jam') {
+    basePrice = (hargaPerHari * lamaSewaHari) + hargaPaket12Jam;
     totalPemasukan = basePrice + biayaTambahanJam;
     calculatedReturnIso = calculateEstimatedReturnWithHours(
       new Date(waktuStartSewa).toISOString(),
-      Number(lamaSewaHari),
+      lamaSewaHari,
+      12 + tambahanJam
+    );
+  } else {
+    basePrice = hargaPerHari * lamaSewaHari;
+    totalPemasukan = basePrice + biayaTambahanJam;
+    calculatedReturnIso = calculateEstimatedReturnWithHours(
+      new Date(waktuStartSewa).toISOString(),
+      lamaSewaHari,
       tambahanJam
     );
   }
@@ -148,6 +160,10 @@ export const TenantBookingMobileView: React.FC<TenantBookingMobileViewProps> = (
 
     const newId = `TRX-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+    const paket12Note = paketKhusus === 'Paket 12 Jam'
+      ? ` [Paket 12 Jam: ${hargaPaket12Jam > 0 ? formatRupiah(hargaPaket12Jam) : 'Harga Opsional Rp 0'}]`
+      : '';
+
     const newTrx: TransaksiSewa = {
       id: newId,
       namaPenyewa: namaPenyewa.trim(),
@@ -161,12 +177,15 @@ export const TenantBookingMobileView: React.FC<TenantBookingMobileViewProps> = (
       lamaSewaHari: paketKhusus === 'Per Jam' 
         ? Number((durasiJam / 24).toFixed(2)) 
         : Number(lamaSewaHari),
-      durasiJam: paketKhusus === 'Per Jam' ? durasiJam : undefined,
+      durasiJam: paketKhusus === 'Per Jam' ? durasiJam : paketKhusus === 'Paket 12 Jam' ? 12 : undefined,
       tambahanJam: paketKhusus !== 'Per Jam' && tambahanJam > 0 ? tambahanJam : undefined,
       paketKhusus: paketKhusus,
+      hargaPaket12Jam: paketKhusus === 'Paket 12 Jam' ? hargaPaket12Jam : undefined,
       estWaktuKembali: calculatedReturnIso,
       hargaPerHari: paketKhusus === 'Per Jam' 
         ? ratePerJam 
+        : paketKhusus === 'Paket 12 Jam' && lamaSewaHari === 0 && hargaPaket12Jam > 0
+        ? hargaPaket12Jam
         : hargaPerHari,
       totalPemasukan,
       statusBayar: 'Belum Bayar',
@@ -174,7 +193,7 @@ export const TenantBookingMobileView: React.FC<TenantBookingMobileViewProps> = (
       statusUnit: 'Booking',
       jumlahHelm,
       levelBensin: bensinAwal as '1 Kotak' | '2 Kotak' | '3 Kotak' | '4 Kotak' | '5 Kotak' | 'Full Kotak',
-      catatanJaminanTambahan: `${jumlahHelm === '0' ? '0 Helm (Bawa Sendiri)' : `${jumlahHelm} Helm SNI`}, Bensin: ${bensinAwal}, Bayar: ${metodePembayaran}${paketKhusus === 'Per Jam' ? ` [Sewa Per Jam: ${durasiJam} Jam]` : ''}${tambahanJam > 0 && paketKhusus !== 'Per Jam' ? ` [Tambahan ${tambahanJam} Jam: +${formatRupiah(biayaTambahanJam)}]` : ''} (Order Mandiri HP)${catatanKhusus.trim() ? ` - ${catatanKhusus.trim()}` : ''}`
+      catatanJaminanTambahan: `${jumlahHelm === '0' ? '0 Helm (Bawa Sendiri)' : `${jumlahHelm} Helm SNI`}, Bensin: ${bensinAwal}, Bayar: ${metodePembayaran}${paketKhusus === 'Per Jam' ? ` [Sewa Per Jam: ${durasiJam} Jam]` : ''}${paket12Note}${tambahanJam > 0 && paketKhusus !== 'Per Jam' ? ` [Tambahan ${tambahanJam} Jam: +${formatRupiah(biayaTambahanJam)}]` : ''} (Order Mandiri HP)${catatanKhusus.trim() ? ` - ${catatanKhusus.trim()}` : ''}`
     };
 
     onBookingSubmit(newTrx);
@@ -194,6 +213,12 @@ export const TenantBookingMobileView: React.FC<TenantBookingMobileViewProps> = (
     let durasiText = `${trx.lamaSewaHari} Hari`;
     if (trx.paketKhusus === 'Per Jam') {
       durasiText = `Sewa Per Jam (${trx.durasiJam || 1} Jam)`;
+    } else if (trx.paketKhusus === 'Paket 12 Jam') {
+      const hariPart = trx.lamaSewaHari > 0 ? `${trx.lamaSewaHari} Hari + ` : '0 Hari / ';
+      const harga12Part = typeof trx.hargaPaket12Jam === 'number' && trx.hargaPaket12Jam > 0
+        ? ` (${formatRupiah(trx.hargaPaket12Jam)})`
+        : ' (Harga Opsional)';
+      durasiText = `${hariPart}Paket 12 Jam${harga12Part}${trx.tambahanJam ? ` + ${trx.tambahanJam} Jam` : ''}`;
     } else if (trx.tambahanJam && trx.tambahanJam > 0) {
       durasiText = `${trx.lamaSewaHari} Hari + Tambahan ${trx.tambahanJam} Jam`;
     }
@@ -325,6 +350,8 @@ Mohon konfirmasi ketersediaan unit dan pengambilan kuncinya. Terima kasih! 🙏`
                   <span className="font-medium text-white">
                     {submittedTrx.paketKhusus === 'Per Jam'
                       ? `Sewa Per Jam (${submittedTrx.durasiJam || 1} Jam)`
+                      : submittedTrx.paketKhusus === 'Paket 12 Jam'
+                      ? `${submittedTrx.lamaSewaHari} Hari + Paket 12 Jam${submittedTrx.tambahanJam ? ` + ${submittedTrx.tambahanJam} Jam` : ''}`
                       : `${submittedTrx.lamaSewaHari} Hari${submittedTrx.tambahanJam ? ` + ${submittedTrx.tambahanJam} Jam` : ''}`}
                   </span>
                 </div>
@@ -498,8 +525,6 @@ Mohon konfirmasi ketersediaan unit dan pengambilan kuncinya. Terima kasih! 🙏`
                   >
                     <option value="Mhs Malang">Mhs Malang (Diskon Khusus)</option>
                     <option value="Luar Malang / Wisatawan">Wisatawan / Umum</option>
-                    <option value="Paket Mingguan">Paket Mingguan (7 Hari)</option>
-                    <option value="Paket Bulanan">Paket Bulanan (30 Hari)</option>
                   </select>
                 </div>
 
@@ -573,28 +598,49 @@ Mohon konfirmasi ketersediaan unit dan pengambilan kuncinya. Terima kasih! 🙏`
               </div>
 
               {/* Pilihan Paket Sewa */}
-              <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+              <div className="grid grid-cols-3 gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
                 <button
                   type="button"
                   onClick={() => setPaketKhusus('Per Jam')}
-                  className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all ${
+                  className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
                     paketKhusus === 'Per Jam'
                       ? 'bg-emerald-400 text-slate-950 shadow-sm'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  ⏱️ Sewa Per Jam (&lt; 12 Jam)
+                  ⏱️ Per Jam (&lt;12j)
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPaketKhusus('Harian')}
-                  className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all ${
+                  onClick={() => {
+                    setPaketKhusus('Paket 12 Jam');
+                    if (lamaSewaHari === 1) {
+                      setLamaSewaHariInput('0');
+                    }
+                  }}
+                  className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                    paketKhusus === 'Paket 12 Jam'
+                      ? 'bg-amber-400 text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  🌗 Paket 12 Jam
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaketKhusus('Harian');
+                    if (lamaSewaHari === 0) {
+                      setLamaSewaHariInput('1');
+                    }
+                  }}
+                  className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
                     paketKhusus === 'Harian'
                       ? 'bg-cyan-400 text-slate-950 shadow-sm'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  📅 Sewa Harian (24 Jam)
+                  📅 Harian (24j)
                 </button>
               </div>
 
@@ -640,29 +686,129 @@ Mohon konfirmasi ketersediaan unit dan pengambilan kuncinya. Terima kasih! 🙏`
                   </div>
                 ) : (
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1">
-                      Durasi Hari *
-                    </label>
-                    <select
-                      value={lamaSewaHari}
-                      onChange={e => setLamaSewaHari(Number(e.target.value))}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 outline-none"
-                    >
-                      <option value={1}>1 Hari (24 Jam)</option>
-                      <option value={2}>2 Hari (48 Jam)</option>
-                      <option value={3}>3 Hari (72 Jam)</option>
-                      <option value={4}>4 Hari</option>
-                      <option value={5}>5 Hari</option>
-                      <option value={7}>1 Minggu (7 Hari)</option>
-                      <option value={14}>2 Minggu (14 Hari)</option>
-                      <option value={30}>1 Bulan (30 Hari)</option>
-                    </select>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-slate-300 font-semibold">
+                        Lama Sewa (Hari)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setLamaSewaHariInput('0')}
+                        className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 hover:bg-rose-950/80 text-slate-300 hover:text-rose-300 border border-slate-700"
+                      >
+                        Hapus / 0 Hari
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      max="90"
+                      placeholder="0"
+                      value={lamaSewaHariInput}
+                      onChange={e => {
+                        const raw = e.target.value;
+                        if (raw === '') {
+                          setLamaSewaHariInput('');
+                        } else {
+                          const parsed = parseInt(raw, 10);
+                          setLamaSewaHariInput(isNaN(parsed) ? '' : String(Math.max(0, parsed)));
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-cyan-500 outline-none font-mono"
+                    />
+                    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                      {[0, 1, 2, 3, 4, 5].map(d => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setLamaSewaHariInput(String(d))}
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold border transition-colors ${
+                            lamaSewaHari === d
+                              ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
+                              : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {d} Hr
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Tambahan Jam Per Jam (hanya untuk Sewa Harian) */}
-              {paketKhusus === 'Harian' && (
+              {/* Panel Paket 12 Jam (Harga Opsional) */}
+              {paketKhusus !== 'Per Jam' && (
+                <div className={`p-3 rounded-xl border space-y-2 ${
+                  paketKhusus === 'Paket 12 Jam'
+                    ? 'bg-amber-950/30 border-amber-500/60'
+                    : 'bg-slate-950 border-slate-800'
+                }`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPaketKhusus(paketKhusus === 'Paket 12 Jam' ? 'Harian' : 'Paket 12 Jam')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                        paketKhusus === 'Paket 12 Jam'
+                          ? 'bg-amber-400 text-slate-950'
+                          : 'bg-slate-800 text-slate-300 border border-slate-700'
+                      }`}
+                    >
+                      {paketKhusus === 'Paket 12 Jam' ? '✓ Paket 12 Jam Aktif' : '🌗 Aktifkan Paket 12 Jam'}
+                    </button>
+                    <span className="text-[10px] font-mono text-amber-300">
+                      {hargaPaket12Jam > 0 ? formatRupiah(hargaPaket12Jam) : 'Harga Opsional'}
+                    </span>
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 text-[11px] mb-1">
+                      Harga Paket 12 Jam (Rp) — <span className="text-amber-300">Opsional</span>:
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="5000"
+                      placeholder="Opsional (Misal: 35000 / 40000 atau kosongkan)"
+                      value={hargaPaket12JamInput}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setHargaPaket12JamInput(val);
+                        if (val.trim() !== '' && paketKhusus !== 'Paket 12 Jam') {
+                          setPaketKhusus('Paket 12 Jam');
+                        }
+                      }}
+                      className="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl px-3 py-1.5 text-white outline-none font-mono text-xs"
+                    />
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {[
+                        { label: 'Rp 0 (Opsional)', val: '' },
+                        { label: '30rb', val: '30000' },
+                        { label: '35rb', val: '35000' },
+                        { label: '40rb', val: '40000' },
+                        { label: '45rb', val: '45000' },
+                        { label: '50rb', val: '50000' },
+                      ].map(p => (
+                        <button
+                          key={p.label}
+                          type="button"
+                          onClick={() => {
+                            setPaketKhusus('Paket 12 Jam');
+                            setHargaPaket12JamInput(p.val);
+                          }}
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold border ${
+                            paketKhusus === 'Paket 12 Jam' && hargaPaket12JamInput === p.val
+                              ? 'bg-amber-400/20 border-amber-400 text-amber-300'
+                              : 'bg-slate-900 border-slate-800 text-slate-400'
+                          }`}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tambahan Jam Per Jam (untuk Sewa Harian / Paket 12 Jam) */}
+              {paketKhusus !== 'Per Jam' && (
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1 flex items-center justify-between">
                     <span>⏱️ Tambahan Lama Sewa Per Jam (Opsional):</span>
@@ -705,7 +851,16 @@ Mohon konfirmasi ketersediaan unit dan pengambilan kuncinya. Terima kasih! 🙏`
                 </div>
 
                 <div className="flex justify-between items-center text-slate-300 border-t border-slate-850 pt-1.5">
-                  <span>Estimasi Biaya ({paketKhusus === 'Per Jam' ? `Sewa Per Jam (${durasiJam} Jam)` : `${lamaSewaHari} Hari`}{tambahanJam > 0 && paketKhusus !== 'Per Jam' ? ` + ${tambahanJam} Jam` : ''}):</span>
+                  <span>
+                    Estimasi Biaya (
+                    {paketKhusus === 'Per Jam'
+                      ? `Sewa Per Jam (${durasiJam} Jam)`
+                      : paketKhusus === 'Paket 12 Jam'
+                      ? `${lamaSewaHari} Hari + Paket 12 Jam`
+                      : `${lamaSewaHari} Hari`}
+                    {tambahanJam > 0 && paketKhusus !== 'Per Jam' ? ` + ${tambahanJam} Jam` : ''}
+                    ):
+                  </span>
                   <span className="text-cyan-400 font-bold font-mono text-sm">
                     {formatRupiah(totalPemasukan)}
                   </span>

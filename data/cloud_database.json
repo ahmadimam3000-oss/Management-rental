@@ -1,0 +1,142 @@
+{
+  "revision": 54,
+  "updatedAt": "2026-10-21T14:00:59.199Z",
+  "fleet": [
+    {
+      "no": 1,
+      "namaUnit": "BEAT 1",
+      "nopol": "L 2054 C",
+      "tipeMotor": "Honda Beat",
+      "status": "Tersedia",
+      "tahun": 2022,
+      "warna": "Hitam Glossy",
+      "kilometer": 24350
+    },
+    {
+      "no": 2,
+      "namaUnit": "BEAT 2",
+      "nopol": "N 4849 ACC",
+      "tipeMotor": "Honda Beat",
+      "status": "Tersedia",
+      "tahun": 2023,
+      "warna": "Merah Hitam",
+      "kilometer": 18420
+    },
+    {
+      "no": 3,
+      "namaUnit": "BEAT 3",
+      "nopol": "N 6836 TDV",
+      "tipeMotor": "Honda Beat",
+      "status": "Tersedia",
+      "tahun": 2023,
+      "warna": "Biru Putih",
+      "kilometer": 19100
+    },
+    {
+      "no": 4,
+      "namaUnit": "BEAT 4",
+      "nopol": "N 3575 VAS",
+      "tipeMotor": "Honda Beat",
+      "status": "Tersedia",
+      "tahun": 2022,
+      "warna": "Hitam Doff",
+      "kilometer": 28900
+    },
+    {
+      "no": 5,
+      "namaUnit": "BEAT 5",
+      "nopol": "N 4961 EDF",
+      "tipeMotor": "Honda Beat",
+      "status": "Tersedia",
+      "tahun": 2023,
+      "warna": "Silver Doff",
+      "kilometer": 16750
+    },
+    {
+      "no": 6,
+      "namaUnit": "BEAT 6",
+      "nopol": "W 6365 NDT",
+      "tipeMotor": "Honda Beat",
+      "status": "Tersedia",
+      "tahun": 2024,
+      "warna": "Putih",
+      "kilometer": 9800
+    },
+    {
+      "no": 7,
+      "namaUnit": "FAZIO",
+      "nopol": "S 4616 NBQ",
+      "tipeMotor": "Yamaha Fazzio",
+      "status": "Tersedia",
+      "tahun": 2023,
+      "warna": "Tosca / Neo Cyan",
+      "kilometer": 15300
+    },
+    {
+      "no": 8,
+      "namaUnit": "FAZIO M 1",
+      "nopol": "N 3711 VAJ",
+      "tipeMotor": "Yamaha Fazzio",
+      "status": "Tersedia",
+      "tahun": 2023,
+      "warna": "Hitam Neo",
+      "kilometer": 14200
+    },
+    {
+      "no": 9,
+      "namaUnit": "FAZIO M 2",
+      "nopol": "P 2409 BO",
+      "tipeMotor": "Yamaha Fazzio",
+      "status": "Tersedia",
+      "tahun": 2023,
+      "warna": "Merah Neo",
+      "kilometer": 17800
+    },
+    {
+      "no": 10,
+      "namaUnit": "FAZIO M 3",
+      "nopol": "L 6312 ABH",
+      "tipeMotor": "Yamaha Fazzio",
+      "status": "Tersedia",
+      "tahun": 2024,
+      "warna": "Putih Mutiara",
+      "kilometer": 8900
+    },
+    {
+      "no": 11,
+      "namaUnit": "SCOPY 1",
+      "nopol": "N 3541 EDB",
+      "tipeMotor": "Honda Scoopy",
+      "status": "Tersedia",
+      "tahun": 2023,
+      "warna": "Prestige White",
+      "kilometer": 21400
+    },
+    {
+      "no": 12,
+      "namaUnit": "SCOPY 2",
+      "nopol": "P 5564 MI",
+      "tipeMotor": "Honda Scoopy",
+      "status": "Tersedia",
+      "tahun": 2022,
+      "warna": "Fashion Brown",
+      "kilometer": 26100
+    },
+    {
+      "no": 13,
+      "namaUnit": "MIO J",
+      "nopol": "N 5540 GH",
+      "tipeMotor": "Yamaha Mio J",
+      "status": "Tersedia",
+      "tahun": 2020,
+      "warna": "Hitam Merah",
+      "kilometer": 42100
+    }
+  ],
+  "transactions": [],
+  "expenses": [],
+  "renters": [],
+  "activeBookYear": 2026,
+  "yearlyRecaps": [],
+  "connectedSheetInfo": null
+}

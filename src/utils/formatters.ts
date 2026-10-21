@@ -107,7 +107,7 @@ export function calculateEstimatedReturnWithHours(startIso: string, days: number
 }
 
 export function checkIsOverdue(trx: TransaksiSewa): { isOverdue: boolean; hoursLate: number } {
-  if (trx.statusUnit === 'Selesai') return { isOverdue: false, hoursLate: 0 };
+  if (trx.statusUnit === 'Selesai' || trx.statusUnit === 'Refund') return { isOverdue: false, hoursLate: 0 };
   const est = new Date(trx.estWaktuKembali).getTime();
   const now = new Date().getTime();
   if (now > est) {
@@ -184,12 +184,24 @@ export function generateWhatsAppMessage(trx: TransaksiSewa, bike?: MotorMaster):
   if (trx.paketKhusus === 'Per Jam') {
     const jam = trx.durasiJam || trx.tambahanJam || 1;
     durasiText = `Sewa Per Jam (${jam} Jam)`;
+  } else if (trx.paketKhusus === 'Paket 12 Jam') {
+    const hariPart = trx.lamaSewaHari > 0 ? `${trx.lamaSewaHari} Hari + ` : '0 Hari / ';
+    const harga12Part = typeof trx.hargaPaket12Jam === 'number' && trx.hargaPaket12Jam > 0
+      ? ` (${formatRupiah(trx.hargaPaket12Jam)})`
+      : ' (Harga Opsional)';
+    const extraJamPart = trx.tambahanJam && trx.tambahanJam > 0 ? ` + Tambahan ${trx.tambahanJam} Jam` : '';
+    durasiText = `${hariPart}Paket 12 Jam${harga12Part}${extraJamPart}`;
   } else if (trx.tambahanJam && trx.tambahanJam > 0) {
     durasiText = `${trx.lamaSewaHari} Hari + Tambahan ${trx.tambahanJam} Jam`;
   }
 
   const metodeBayar = trx.metodePembayaran || 'Tunai';
   const metodeDesc = getPaymentMethodLabel(metodeBayar);
+
+  const refundBlock =
+    trx.statusUnit === 'Refund' || trx.statusBayar === 'Refund' || (trx.nominalRefund && trx.nominalRefund > 0)
+      ? `\n💸 *INFORMASI REFUND TRANSAKSI*:\n• Status: *REFUND*\n• Total Awal: ${formatRupiah(trx.pemasukanAwalSebelumRefund ?? (trx.totalPemasukan + (trx.nominalRefund || 0)))}\n• Nominal Refund: *${formatRupiah(trx.nominalRefund || 0)}*\n• Sisa Pemasukan Bersih: *${totalFmt}*\n• Keterangan Refund: *${trx.keteranganRefund || '-'}*\n• Waktu Refund: ${trx.waktuRefund ? formatIndonesianDateTime(trx.waktuRefund) : '-'}\n`
+      : '';
 
   return `🛵 *NOTA & BUKTI SEWA AI RENT*
 No. Transaksi: *${trx.id}*
@@ -209,7 +221,7 @@ No. Transaksi: *${trx.id}*
 • Tarif: ${rateFmt}
 • Total Sewa: *${totalFmt}*
 • Metode Pembayaran: *${metodeDesc}*
-• Status Bayar: *${trx.statusBayar}*
+• Status Bayar: *${trx.statusBayar}*${refundBlock}
 
 💳 *OPSI PEMBAYARAN RESMI AI RENT*:
 1. *Tunai* (Bayar langsung di kasir)
@@ -253,7 +265,9 @@ export function exportTransactionsToCSV(transactions: TransaksiSewa[]): void {
     'Lama Sewa (Hari)',
     'Est. Waktu Kembali',
     'Harga / Hari (Rp)',
-    'Total Pemasukan (Rp)',
+    'Total Pemasukan Bersih (Rp)',
+    'Nominal Refund (Rp)',
+    'Keterangan Refund',
     'Metode Pembayaran',
     'Status Bayar',
     'Status Unit',
@@ -276,6 +290,8 @@ export function exportTransactionsToCSV(transactions: TransaksiSewa[]): void {
     `"${t.estWaktuKembali}"`,
     t.hargaPerHari,
     t.totalPemasukan,
+    t.nominalRefund || 0,
+    `"${(t.keteranganRefund || '').replace(/"/g, '""')}"`,
     `"${t.metodePembayaran || 'Tunai'}"`,
     `"${t.statusBayar}"`,
     `"${t.statusUnit}"`,

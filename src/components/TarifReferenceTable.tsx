@@ -23,27 +23,36 @@ export const TarifReferenceTable: React.FC<TarifReferenceTableProps> = ({
   // Calculator state
   const [selectedTipe, setSelectedTipe] = useState('Honda Beat');
   const [selectedKategori, setSelectedKategori] = useState('Mhs Malang');
-  const [lamaHari, setLamaHari] = useState(1);
-  const [simPaketKhusus, setSimPaketKhusus] = useState<'Harian' | 'Per Jam'>('Harian');
+  const [lamaHariInput, setLamaHariInput] = useState<string>('1');
+  const [simPaketKhusus, setSimPaketKhusus] = useState<'Harian' | 'Paket 12 Jam' | 'Per Jam'>('Harian');
+  const [simHargaPaket12JamInput, setSimHargaPaket12JamInput] = useState<string>('');
   const [simDurasiJam, setSimDurasiJam] = useState<number>(1);
   const [simTambahanJam, setSimTambahanJam] = useState<number>(0);
   const [copiedBri, setCopiedBri] = useState(false);
   const [showQrisZoom, setShowQrisZoom] = useState(false);
+
+  const lamaHari = lamaHariInput.trim() === ''
+    ? 0
+    : Math.max(0, parseInt(lamaHariInput, 10) || 0);
+
+  const simHargaPaket12Jam = simHargaPaket12JamInput.trim() === ''
+    ? 0
+    : Math.max(0, parseInt(simHargaPaket12JamInput, 10) || 0);
 
   const currentTarif = TARIF_STANDAR.find(t => t.tipeMotor === selectedTipe) || TARIF_STANDAR[1];
 
   let dailyRate = currentTarif.mhsMalang24Jam;
   if (selectedKategori === 'Luar Malang / Wisatawan') {
     dailyRate = currentTarif.luarMalang24Jam;
-  } else if (selectedKategori === 'Paket Mingguan') {
-    dailyRate = Math.round(currentTarif.paketMinggu / 7);
-  } else if (selectedKategori === 'Paket Bulanan') {
-    dailyRate = Math.round(currentTarif.paketBulan / 30);
   }
 
   const ratePerJam = calculateHourlyOvertimeFee(simDurasiJam);
-  const feeTambahanJam = simPaketKhusus === 'Harian' ? calculateHourlyOvertimeFee(simTambahanJam) : 0;
-  const baseCost = simPaketKhusus === 'Per Jam' ? ratePerJam : (dailyRate * Math.max(1, lamaHari));
+  const feeTambahanJam = simPaketKhusus !== 'Per Jam' ? calculateHourlyOvertimeFee(simTambahanJam) : 0;
+  const baseCost = simPaketKhusus === 'Per Jam'
+    ? ratePerJam
+    : simPaketKhusus === 'Paket 12 Jam'
+    ? (dailyRate * lamaHari) + simHargaPaket12Jam
+    : (dailyRate * lamaHari);
   const estimatedTotal = baseCost + feeTambahanJam;
 
   return (
@@ -53,13 +62,13 @@ export const TarifReferenceTable: React.FC<TarifReferenceTableProps> = ({
       <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800">
         <div className="max-w-2xl">
           <span className="text-xs uppercase tracking-wider text-cyan-400 font-semibold">
-            Standar Tarif & Kebijakan Harga · Ai Rent
+            Standar Tarif &amp; Kebijakan Harga · Ai Rent
           </span>
           <h2 className="text-xl sm:text-2xl font-bold text-white mt-1">
             Tabel Acuan Tarif Sewa Standar Ai Rent
           </h2>
           <p className="text-sm text-slate-300 mt-2">
-            Pedoman tarif resmi Ai Rent untuk Sewa Per Jam (di bawah 12 jam), Mahasiswa Malang (dengan KTM aktif), wisatawan/tamu luar kota, dan paket hemat mingguan/bulanan.
+            Pedoman tarif resmi Ai Rent untuk Sewa Per Jam (di bawah 12 jam), Paket Sewa 12 Jam (harga opsional), serta sewa harian (24 Jam) bagi Mahasiswa Malang (dengan KTM aktif) dan wisatawan/tamu luar kota.
           </p>
         </div>
       </div>
@@ -82,8 +91,6 @@ export const TarifReferenceTable: React.FC<TarifReferenceTableProps> = ({
                   <th className="py-3 px-4">Tipe Motor</th>
                   <th className="py-3 px-4 text-right">Mhs Malang / 24 Jam</th>
                   <th className="py-3 px-4 text-right">Luar Malang / Wisatawan</th>
-                  <th className="py-3 px-4 text-right">Paket 1 Minggu</th>
-                  <th className="py-3 px-4 text-right">Paket 1 Bulan</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/80">
@@ -95,7 +102,7 @@ export const TarifReferenceTable: React.FC<TarifReferenceTableProps> = ({
                     <td className="py-3.5 px-4 font-semibold text-white">
                       {item.tipeMotor}
                       <div className="text-[11px] text-slate-400 font-normal">
-                        Matic irit & terawat
+                        Matic irit &amp; terawat
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-right font-mono font-medium text-emerald-400 tabular-nums">
@@ -103,12 +110,6 @@ export const TarifReferenceTable: React.FC<TarifReferenceTableProps> = ({
                     </td>
                     <td className="py-3.5 px-4 text-right font-mono font-medium text-cyan-400 tabular-nums">
                       {formatRupiah(item.luarMalang24Jam)}
-                    </td>
-                    <td className="py-3.5 px-4 text-right font-mono font-medium text-amber-400 tabular-nums">
-                      {formatRupiah(item.paketMinggu)}
-                    </td>
-                    <td className="py-3.5 px-4 text-right font-mono font-medium text-purple-400 tabular-nums">
-                      {formatRupiah(item.paketBulan)}
                     </td>
                   </tr>
                 ))}
@@ -256,7 +257,7 @@ export const TarifReferenceTable: React.FC<TarifReferenceTableProps> = ({
 
             <ul className="list-disc list-inside space-y-1 text-slate-400 text-[11px] pt-1 border-t border-slate-800/60">
               <li>Jaminan wajib: KTP Asli + identitas pendukung (KTM / SIM C / BPJS / KK).</li>
-              <li>Hitungan sewa harian 24 Jam sejak unit diterima/check-in, atau sewa per jam di bawah 12 jam (minimal 1 jam).</li>
+              <li>Hitungan sewa harian 24 Jam sejak unit diterima/check-in, Paket 12 Jam (harga opsional), atau sewa per jam di bawah 12 jam.</li>
               <li>Free delivery / antar-jemput area kampus UB, UM, UIN, Dinoyo, Suhat (S&amp;K berlaku).</li>
             </ul>
           </div>
@@ -272,29 +273,46 @@ export const TarifReferenceTable: React.FC<TarifReferenceTableProps> = ({
               </h3>
             </div>
 
-            {/* Pilihan Paket: Per Jam vs Harian */}
-            <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
+            {/* Pilihan Paket: Per Jam vs Paket 12 Jam vs Harian */}
+            <div className="grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-[11px]">
               <button
                 type="button"
                 onClick={() => setSimPaketKhusus('Per Jam')}
-                className={`flex-1 py-1 px-2 rounded-md font-semibold transition-all ${
+                className={`py-1 px-1.5 rounded-md font-semibold transition-all cursor-pointer ${
                   simPaketKhusus === 'Per Jam'
                     ? 'bg-emerald-400 text-slate-950'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                ⏱️ Per Jam (&lt;12j)
+                ⏱️ Per Jam
               </button>
               <button
                 type="button"
-                onClick={() => setSimPaketKhusus('Harian')}
-                className={`flex-1 py-1 px-2 rounded-md font-semibold transition-all ${
+                onClick={() => {
+                  setSimPaketKhusus('Paket 12 Jam');
+                  if (lamaHari === 1) setLamaHariInput('0');
+                }}
+                className={`py-1 px-1.5 rounded-md font-semibold transition-all cursor-pointer ${
+                  simPaketKhusus === 'Paket 12 Jam'
+                    ? 'bg-amber-400 text-slate-950'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                🌗 12 Jam
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSimPaketKhusus('Harian');
+                  if (lamaHari === 0) setLamaHariInput('1');
+                }}
+                className={`py-1 px-1.5 rounded-md font-semibold transition-all cursor-pointer ${
                   simPaketKhusus === 'Harian'
                     ? 'bg-cyan-400 text-slate-950'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                📅 Harian (24j)
+                📅 Harian
               </button>
             </div>
 
@@ -316,45 +334,81 @@ export const TarifReferenceTable: React.FC<TarifReferenceTableProps> = ({
               </select>
             </div>
 
-            {/* Select Category (if Harian) */}
-            {simPaketKhusus === 'Harian' && (
+            {/* Select Category (if Harian / Paket 12 Jam) */}
+            {simPaketKhusus !== 'Per Jam' && (
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
                   Kategori Pelanggan:
                 </label>
                 <select
                   value={selectedKategori}
-                  onChange={e => {
-                    const val = e.target.value;
-                    setSelectedKategori(val);
-                    if (val === 'Paket Mingguan') setLamaHari(7);
-                    if (val === 'Paket Bulanan') setLamaHari(30);
-                  }}
+                  onChange={e => setSelectedKategori(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:border-cyan-500 outline-none"
                 >
                   <option value="Mhs Malang">Mhs Malang (Mahasiswa)</option>
                   <option value="Luar Malang / Wisatawan">Luar Malang / Wisatawan</option>
-                  <option value="Paket Mingguan">Paket 1 Minggu</option>
-                  <option value="Paket Bulanan">Paket 1 Bulan</option>
                 </select>
               </div>
             )}
 
-            {/* Duration Slider/Input */}
-            {simPaketKhusus === 'Harian' ? (
-              <div>
-                <div className="flex items-center justify-between text-xs text-slate-300 mb-1">
-                  <span>Durasi Sewa:</span>
-                  <span className="font-mono font-bold text-cyan-400">{lamaHari} Hari</span>
+            {/* Duration Input */}
+            {simPaketKhusus !== 'Per Jam' ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-300">
+                  <span>Lama Sewa (Hari):</span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setLamaHariInput('0')}
+                      className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-300 border border-slate-700 cursor-pointer"
+                    >
+                      0 Hari
+                    </button>
+                    <span className="font-mono font-bold text-cyan-400">{lamaHari} Hari</span>
+                  </div>
                 </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="30"
-                  value={lamaHari}
-                  onChange={e => setLamaHari(parseInt(e.target.value))}
-                  className="w-full accent-cyan-400 bg-slate-800 h-1.5 rounded-lg"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="90"
+                    placeholder="0"
+                    value={lamaHariInput}
+                    onChange={e => {
+                      const raw = e.target.value;
+                      if (raw === '') setLamaHariInput('');
+                      else {
+                        const p = parseInt(raw, 10);
+                        setLamaHariInput(isNaN(p) ? '' : String(Math.max(0, p)));
+                      }
+                    }}
+                    className="w-20 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-white font-mono outline-none focus:border-cyan-500"
+                  />
+                  <input
+                    type="range"
+                    min="0"
+                    max="30"
+                    value={lamaHari}
+                    onChange={e => setLamaHariInput(e.target.value)}
+                    className="flex-1 accent-cyan-400 bg-slate-800 h-1.5 rounded-lg"
+                  />
+                </div>
+                {simPaketKhusus === 'Paket 12 Jam' && (
+                  <div className="pt-1">
+                    <label className="block text-[11px] font-medium text-amber-300 mb-1">
+                      🌗 Harga Paket 12 Jam (Rp) — Opsional:
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="5000"
+                      placeholder="Opsional (Misal: 35000 / 40000 atau kosongkan)"
+                      value={simHargaPaket12JamInput}
+                      onChange={e => setSimHargaPaket12JamInput(e.target.value)}
+                      className="w-full bg-slate-950 border border-amber-700/60 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono outline-none"
+                    />
+                  </div>
+                )}
               </div>
             ) : (
               <div>
@@ -382,8 +436,8 @@ export const TarifReferenceTable: React.FC<TarifReferenceTableProps> = ({
               </div>
             )}
 
-            {/* Tambahan Jam Per Jam (if Harian) */}
-            {simPaketKhusus === 'Harian' && (
+            {/* Tambahan Jam Per Jam (if Harian / Paket 12 Jam) */}
+            {simPaketKhusus !== 'Per Jam' && (
               <div>
                 <div className="flex items-center justify-between text-xs text-slate-300 mb-1">
                   <span>⏱️ Tambahan Jam:</span>
@@ -411,12 +465,14 @@ export const TarifReferenceTable: React.FC<TarifReferenceTableProps> = ({
             {/* Result Box */}
             <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800/80 space-y-1.5 text-xs">
               <div className="flex items-center justify-between text-slate-400">
-                <span>Biaya Pokok ({simPaketKhusus === 'Per Jam' ? `${simDurasiJam} Jam` : `${lamaHari} Hari`}):</span>
+                <span>
+                  Biaya Pokok ({simPaketKhusus === 'Per Jam' ? `${simDurasiJam} Jam` : simPaketKhusus === 'Paket 12 Jam' ? `${lamaHari} Hari + 12 Jam` : `${lamaHari} Hari`}):
+                </span>
                 <span className="font-mono text-slate-200 tabular-nums">
                   {formatRupiah(baseCost)}
                 </span>
               </div>
-              {simPaketKhusus === 'Harian' && simTambahanJam > 0 && (
+              {simPaketKhusus !== 'Per Jam' && simTambahanJam > 0 && (
                 <div className="flex items-center justify-between text-slate-400">
                   <span>Tambahan {simTambahanJam} Jam:</span>
                   <span className="font-mono text-cyan-300 tabular-nums">

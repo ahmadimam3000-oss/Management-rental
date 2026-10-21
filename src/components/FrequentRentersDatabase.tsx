@@ -331,8 +331,6 @@ export const FrequentRentersDatabase: React.FC<FrequentRentersDatabaseProps> = (
             <option value="all">Semua Kategori</option>
             <option value="Mhs Malang">Mhs Malang</option>
             <option value="Luar Malang / Wisatawan">Luar Malang / Wisatawan</option>
-            <option value="Paket Mingguan">Paket Mingguan</option>
-            <option value="Paket Bulanan">Paket Bulanan</option>
           </select>
 
           <select
@@ -588,8 +586,6 @@ export const FrequentRentersDatabase: React.FC<FrequentRentersDatabaseProps> = (
                   >
                     <option value="Mhs Malang">Mhs Malang</option>
                     <option value="Luar Malang / Wisatawan">Luar Malang / Wisatawan</option>
-                    <option value="Paket Mingguan">Paket Mingguan</option>
-                    <option value="Paket Bulanan">Paket Bulanan</option>
                   </select>
                 </div>
               </div>
