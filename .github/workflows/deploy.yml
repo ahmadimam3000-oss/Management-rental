@@ -41,7 +41,7 @@ jobs:
           cp dist/index.html dist/404.html
           touch dist/.nojekyll
 
-      - name: Publish build to gh-pages branch
+      - name: Publish build to gh-pages branch and switch Pages source
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -54,6 +54,8 @@ jobs:
           git add -A
           git commit -m "Deploy Ai Rent to GitHub Pages"
           git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
+          gh api -X PUT "repos/${GITHUB_REPOSITORY}/pages" -f "source[branch]=gh-pages" -f "source[path]=/" 2>/dev/null || \
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/pages" -f "source[branch]=gh-pages" -f "source[path]=/" 2>/dev/null || true
 
       - name: Configure GitHub Pages (Actions mode)
         id: configure_pages
@@ -70,14 +72,6 @@ jobs:
         with:
           path: './dist'
 
-      - name: Fallback enable Pages from gh-pages branch
-        if: steps.configure_pages.outcome != 'success'
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api -X POST "repos/${GITHUB_REPOSITORY}/pages" -f "source[branch]=gh-pages" -f "source[path]=/" || true
-
   deploy:
     needs: build
     if: needs.build.outputs.pages_ready == 'true'
@@ -89,3 +83,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true

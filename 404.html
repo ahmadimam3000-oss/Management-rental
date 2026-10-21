@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="id" class="dark" style="background-color: #020617; color: #f8fafc;">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <meta name="theme-color" content="#020617" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Ai Rent" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+    <title>Ai Rent · Sistem Manajemen Rental Motor (13 Fleet)</title>
+    <meta name="description" content="Ai Rent - Aplikasi manajemen operasional rental motor 13 unit armada dengan fitur Check-In/Check-Out, sewa per jam & harian, kalkulasi tarif otomatis, pencatatan pengeluaran operasional, laporan laba bersih bulanan, dan analisis ADR." />
+    <meta property="og:title" content="Ai Rent · Sistem Manajemen Rental Motor (13 Fleet)" />
+    <meta property="og:description" content="Ai Rent - Aplikasi manajemen operasional rental motor 13 unit armada dengan fitur Check-In/Check-Out, sewa per jam & harian, kalkulasi tarif otomatis, pencatatan pengeluaran operasional, laporan laba bersih bulanan, dan analisis ADR." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  </head>
+  <body style="background-color: #020617; color: #f8fafc; margin: 0;">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      (function () {
+        var h = window.location.hostname;
+        var hasRawTsxEntry = !!document.querySelector('script[src="/src/main.tsx"]');
+        if (
+          hasRawTsxEntry &&
+          (h.endsWith('.github.io') || h.endsWith('.pages.dev') || h.endsWith('.vercel.app') || h.endsWith('.netlify.app'))
+        ) {
+          var css = document.createElement('link');
+          css.rel = 'stylesheet';
+          css.href = './live-bundle/app.css';
+          document.head.appendChild(css);
+
+          var js = document.createElement('script');
+          js.type = 'module';
+          js.src = './live-bundle/app.js';
+          document.body.appendChild(js);
+        }
+      })();
+    </script>
+  </body>
+</html>
