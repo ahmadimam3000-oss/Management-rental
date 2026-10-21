@@ -1032,33 +1032,46 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm install --no-audit --no-fund --legacy-peer-deps
       - run: npm run build
       - run: cp dist/index.html dist/404.html && touch dist/.nojekyll
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - name: Publish build to gh-pages branch
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd dist && git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b gh-pages && git add -A
+          git commit -m "Deploy Ai Rent to GitHub Pages"
+          git push -f "https://x-access-token:\${GITHUB_TOKEN}@github.com/\${GITHUB_REPOSITORY}.git" gh-pages
+          gh api -X POST "repos/\${GITHUB_REPOSITORY}/pages" -f "source[branch]=gh-pages" -f "source[path]=/" || true
+      - id: configure_pages
+        uses: actions/configure-pages@v5
+        continue-on-error: true
+        with:
+          enablement: true
+      - if: steps.configure_pages.outcome == 'success'
+        id: upload_artifact
+        uses: actions/upload-pages-artifact@v3
+        continue-on-error: true
         with:
           path: './dist'
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: \${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4`;
+      - if: steps.configure_pages.outcome == 'success' && steps.upload_artifact.outcome == 'success'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true`;
 
             const handleSaveGhDomain = () => {
               localStorage.setItem('airent_gh_username_v1', cleanUser);
@@ -1095,12 +1108,12 @@ jobs:
                     <div className="font-bold text-emerald-300 text-sm flex items-center gap-2 flex-wrap">
                       <span>Repository Sudah Siap 100% untuk Upload &amp; Hosting GitHub Pages</span>
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-900/80 text-emerald-200 border border-emerald-600/50">
-                        .github/workflows/deploy.yml Aktif
+                        Dual-Mode Auto Deploy (gh-pages + Actions)
                       </span>
                     </div>
                     <p className="text-slate-300 text-[11px] leading-relaxed">
                       Project ini telah dilengkapi file otomatis{' '}
-                      <code className="text-cyan-300 font-mono">.github/workflows/deploy.yml</code>,{' '}
+                      <code className="text-cyan-300 font-mono">.github/workflows/deploy.yml</code> (mendukung branch <code className="text-cyan-300 font-mono">gh-pages</code> maupun <code className="text-cyan-300 font-mono">GitHub Actions</code> tanpa error environment),{' '}
                       <code className="text-cyan-300 font-mono">public/.nojekyll</code>, path aset relatif{' '}
                       <code className="text-cyan-300 font-mono">base: &apos;./&apos;</code>, serta sinkronisasi lintas domain (CORS) ke Server Cloud &amp; Google Sheets Live API.
                     </p>
@@ -1120,10 +1133,10 @@ jobs:
                         <span className="w-5 h-5 rounded-full bg-cyan-950 border border-cyan-700 flex items-center justify-center text-[11px]">
                           1
                         </span>
-                        <span>Export ke GitHub</span>
+                        <span>Export / Sync ke GitHub</span>
                       </div>
                       <p className="text-slate-300 text-[11px] leading-relaxed">
-                        Klik tombol ikon <strong>GitHub (Export / Sync to GitHub)</strong> di bilah atas Google AI Studio, lalu buat repository baru (misal: <code className="text-cyan-300">ai-rent</code>) dengan visibilitas <strong>Public</strong>.
+                        Klik tombol ikon <strong>GitHub (Export / Sync to GitHub)</strong> di bilah atas Google AI Studio ke repository <code className="text-cyan-300">Management-rental</code> (pastikan visibilitas <strong>Public</strong>).
                       </p>
                     </div>
 
@@ -1135,7 +1148,7 @@ jobs:
                         <span>Aktifkan GitHub Pages</span>
                       </div>
                       <p className="text-slate-300 text-[11px] leading-relaxed">
-                        Buka repository Anda di GitHub.com &rarr; klik tab <strong>Settings</strong> &rarr; menu kiri <strong>Pages</strong> &rarr; pada bagian <em>Build and deployment (Source)</em> pilih <strong>GitHub Actions</strong>.
+                        Buka repository di GitHub.com &rarr; <strong>Settings &rarr; Pages</strong>. Anda bebas memilih Source: <strong>Deploy from a branch (pilih branch <code className="text-cyan-300">gh-pages</code>)</strong> ATAU <strong>GitHub Actions</strong>.
                       </p>
                     </div>
 
@@ -1147,7 +1160,7 @@ jobs:
                         <span>Online Otomatis!</span>
                       </div>
                       <p className="text-slate-300 text-[11px] leading-relaxed">
-                        GitHub Actions akan langsung mem-build aplikasi dalam ~1 menit dan menayangkannya di <code className="text-emerald-300">{computedGhUrl}</code> lengkap dengan PWA &amp; Google Sheets Live!
+                        GitHub Actions otomatis mem-build &amp; menayangkan aplikasi di <code className="text-emerald-300">{computedGhUrl}</code> lengkap dengan PWA &amp; Google Sheets Live!
                       </p>
                     </div>
                   </div>

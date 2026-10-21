@@ -150,4 +150,11 @@ export interface YearlyRecapArchive {
   notes?: string;
 }
 
-
+export interface ConnectedSheetInfo {
+  spreadsheetId: string;
+  spreadsheetTitle: string;
+  spreadsheetUrl: string;
+  lastSyncedAt: string;
+  lastSyncedBy?: string;
+  autoSyncEnabled?: boolean;
+}

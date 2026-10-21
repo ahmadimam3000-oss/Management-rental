@@ -15,8 +15,8 @@ import type {
   PengeluaranMotor,
   FrequentRenter,
   YearlyRecapArchive,
+  ConnectedSheetInfo,
 } from './src/types/rental.ts';
-import type { ConnectedSheetInfo } from './src/services/googleSheetsService.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

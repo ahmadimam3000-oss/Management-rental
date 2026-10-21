@@ -6,7 +6,6 @@ import {
   onAuthStateChanged,
   User,
 } from 'firebase/auth';
-import firebaseConfig from '../../firebase-applet-config.json';
 import {
   MotorMaster,
   TransaksiSewa,
@@ -19,7 +18,20 @@ import {
   PaymentStatus,
   PaymentMethod,
   ExpenseCategory,
+  ConnectedSheetInfo,
 } from '../types/rental';
+
+export type { ConnectedSheetInfo };
+
+const firebaseConfig = {
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'promising-chord-bw2pc',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:141628390228:web:3b0951fc176a2d49b1e6c1',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyAOBv61EkWEG9vMVFgBbX_4ckr5iHJAjwc',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'promising-chord-bw2pc.firebaseapp.com',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'promising-chord-bw2pc.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '141628390228',
+  measurementId: '',
+};
 
 // Workspace OAuth Scopes configured for Google Drive & Google Sheets
 export const SCOPES = [
@@ -106,15 +118,6 @@ export interface SpreadsheetMetadataInfo {
   title: string;
   spreadsheetUrl: string;
   sheetTitles: string[];
-}
-
-export interface ConnectedSheetInfo {
-  spreadsheetId: string;
-  spreadsheetTitle: string;
-  spreadsheetUrl: string;
-  lastSyncedAt: string;
-  lastSyncedBy?: string;
-  autoSyncEnabled?: boolean;
 }
 
 // Standard tab names used by Ai Rent
